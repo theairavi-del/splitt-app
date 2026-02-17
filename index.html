@@ -124,15 +124,47 @@
         <div class="pt-20 px-6 flex-1 flex flex-col">
             <h2 class="text-2xl font-bold mb-4">Add Receipt</h2>
             <div class="flex gap-2 mb-4">
-                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px; background: var(--primary);">Paste</button>
+                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">📷 Camera</button>
+                <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px;">Paste</button>
                 <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('manual')" id="tab-manual" style="min-height: 44px;">Manual</button>
             </div>
-            <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...\n\nExample:\n2x Chicken Wings $24.00\nCaesar Salad $12.50\nTax $3.65\nTip $8.00\nTotal $48.15"></textarea>
-            <div id="manualInput" class="hidden">
+            
+            <!-- Camera Tab -->
+            <div id="cameraSection" class="flex-1 flex flex-col">
+                <input type="file" id="receiptImage" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+                <div id="cameraPreview" class="hidden flex-1 flex flex-col">
+                    <img id="previewImg" class="w-full max-h-64 object-contain rounded-xl mb-4 bg-black">
+                    <div id="scanningOverlay" class="hidden relative">
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/20 to-transparent h-8 animate-pulse"></div>
+                        <div class="text-center text-green-400 font-bold">🔍 Scanning receipt...</div>
+                    </div>
+                </div>
+                <div id="cameraButtons" class="flex-1 flex flex-col justify-center gap-4">
+                    <button class="btn btn-primary w-full" onclick="document.getElementById('receiptImage').click()">
+                        📷 Take Photo
+                    </button>
+                    <button class="btn btn-outline w-full" onclick="document.getElementById('receiptImage').click()">
+                        🖼️ Choose from Gallery
+                    </button>
+                </div>
+                <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
+                    <div class="text-sm mb-2" style="color: var(--text-secondary);">Extracted Items:</div>
+                    <div id="extractedItems" class="space-y-2"></div>
+                </div>
+            </div>
+            
+            <!-- Paste Tab -->
+            <div id="pasteSection" class="hidden flex-1 flex flex-col">
+                <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...\n\nExample:\n2x Chicken Wings $24.00\nCaesar Salad $12.50\nTax $3.65\nTip $8.00\nTotal $48.15"></textarea>
+            </div>
+            
+            <!-- Manual Tab -->
+            <div id="manualInput" class="hidden flex-1 flex flex-col">
                 <input type="text" class="input" id="manualName" placeholder="Item name">
                 <input type="number" class="input" id="manualPrice" placeholder="Price" step="0.01">
                 <button class="btn btn-outline w-full mb-4" onclick="addManualItem()">Add Item</button>
             </div>
+            
             <div class="card mb-4 max-h-48 overflow-y-auto" id="previewBox">
                 <div class="text-center py-8" style="color: var(--text-secondary);">Receipt preview will appear here</div>
             </div>
@@ -397,18 +429,113 @@
         function goToReceipt() { state.session.status = 'receipt'; saveSession(); showScreen('receipt'); }
 
         function setTab(t) {
+            document.getElementById('cameraSection').classList.toggle('hidden', t !== 'camera');
             document.getElementById('pasteSection').classList.toggle('hidden', t !== 'paste');
             document.getElementById('manualInput').classList.toggle('hidden', t !== 'manual');
+            document.getElementById('tab-camera').style.background = t === 'camera' ? 'var(--primary)' : 'transparent';
             document.getElementById('tab-paste').style.background = t === 'paste' ? 'var(--primary)' : 'transparent';
             document.getElementById('tab-manual').style.background = t === 'manual' ? 'var(--primary)' : 'transparent';
         }
 
+        let extractedItemsFromImage = [];
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('cameraPreview').classList.remove('hidden');
+                document.getElementById('cameraButtons').classList.add('hidden');
+                document.getElementById('scanningOverlay').classList.remove('hidden');
+                
+                // Simulate OCR processing
+                setTimeout(() => {
+                    simulateOCR();
+                }, 2000);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function simulateOCR() {
+            document.getElementById('scanningOverlay').classList.add('hidden');
+            document.getElementById('cameraResults').classList.remove('hidden');
+            
+            // Demo extracted items (in real app, this would come from OCR API)
+            extractedItemsFromImage = [
+                { name: 'Chicken Wings', price: 24.00, quantity: 2 },
+                { name: 'Caesar Salad', price: 12.50, quantity: 1 },
+                { name: 'Soda', price: 3.00, quantity: 2 },
+                { name: 'Tax', price: 3.65, quantity: 1, isTax: true },
+                { name: 'Tip', price: 8.00, quantity: 1, isTip: true }
+            ];
+            
+            renderExtractedItems();
+        }
+
+        function renderExtractedItems() {
+            const container = document.getElementById('extractedItems');
+            container.innerHTML = '';
+            
+            extractedItemsFromImage.forEach((item, i) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-3 rounded-lg';
+                div.style.background = item.isTax || item.isTip ? 'rgba(139, 92, 246, 0.1)' : 'var(--surface-light)';
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
+                        ${item.isTax || item.isTip ? '<div class="text-xs text-purple-400">Auto-detected</div>' : ''}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-green-400">$${item.price.toFixed(2)}</span>
+                        <button class="text-red-400" onclick="removeExtractedItem(${i})">✕</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Update preview box
+            const previewBox = document.getElementById('previewBox');
+            previewBox.innerHTML = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip).map(item => `
+                <div class="flex justify-between py-2 border-b" style="border-color: var(--border);">
+                    <span>${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</span>
+                    <span>$${item.price.toFixed(2)}</span>
+                </div>
+            `).join('');
+            
+            // Set the session items
+            const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+            const taxItem = extractedItemsFromImage.find(i => i.isTax);
+            const tipItem = extractedItemsFromImage.find(i => i.isTip);
+            
+            state.session.items = foodItems.map((it, i) => ({ ...it, id: 'it_' + i }));
+            state.session.tax = taxItem ? taxItem.price : 0;
+            state.session.tip = tipItem ? tipItem.price : 0;
+        }
+
+        function removeExtractedItem(index) {
+            extractedItemsFromImage.splice(index, 1);
+            renderExtractedItems();
+        }
+
         function processReceipt() {
-            const text = document.getElementById('receiptText').value;
-            const parsed = parser.parseReceiptText(text);
-            state.session.items = parsed.items.map((it, i) => ({ ...it, id: 'it_' + i }));
-            state.session.tax = parsed.tax;
-            state.session.tip = parsed.tip;
+            // Check if we have items from camera or from text paste
+            if (extractedItemsFromImage.length > 0) {
+                // Already set from camera
+            } else {
+                const text = document.getElementById('receiptText').value;
+                const parsed = parser.parseReceiptText(text);
+                state.session.items = parsed.items.map((it, i) => ({ ...it, id: 'it_' + i }));
+                state.session.tax = parsed.tax;
+                state.session.tip = parsed.tip;
+            }
+            
+            if (state.session.items.length === 0) {
+                alert('No items found! Please add items first.');
+                return;
+            }
+            
             state.session.status = 'selecting';
             saveSession();
             showSelection();
