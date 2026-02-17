@@ -1,66 +1,318 @@
-        // State Management (inline since agent files aren't easily importable)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SPLITT - Split Bills Instantly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-light: #1f1f1f;
+            --border: #2a2a2a;
+            --primary: #8B5CF6;
+            --success: #22c55e;
+            --warning: #facc15;
+            --error: #dc2626;
+            --text: #ffffff;
+            --text-secondary: #a1a1a1;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+        .screen { display: none; min-height: 100vh; animation: slideIn 0.3s ease; }
+        .screen.active { display: flex; flex-direction: column; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); } 50% { box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 5px rgba(250, 204, 21, 0.2); } 50% { box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); } }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .btn { min-height: 60px; padding: 0 32px; border-radius: 14px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: black; }
+        .btn-warning { background: var(--yellow); color: black; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        .input { width: 100%; min-height: 60px; padding: 16px 20px; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); font-size: 18px; margin-bottom: 12px; }
+        .input:focus { outline: none; border-color: var(--primary); }
+        .card { background: var(--surface); border: 2px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 12px; }
+        .emoji-bounce { animation: bounce 1.5s infinite; }
+        .pulse-ring { animation: pulse 2s infinite; }
+        .orphan-glow { animation: glow 2s infinite; border-color: var(--yellow) !important; }
+        .nav { position: fixed; top: 0; left: 0; right: 0; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid var(--border); }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--surface); border: 2px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; }
+        .pin-input { width: 50px; height: 60px; text-align: center; font-size: 24px; font-weight: 900; padding: 0; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); }
+        .progress-bar { width: 100%; height: 8px; background: var(--surface-light); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 0.3s ease; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; }
+        .avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--surface-light); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 3px solid var(--border); animation: popIn 0.3s ease; }
+        .avatar.me { border-color: var(--primary); animation: popIn 0.3s ease, pulse 2s infinite; }
+        .claimant-tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--surface-light); border-radius: 20px; font-size: 13px; margin: 4px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav" id="nav" style="display: none;">
+        <div class="text-2xl font-black" style="color: var(--primary);">SPLITT</div>
+        <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
+    </nav>
+
+    <!-- Screen 1: Welcome -->
+    <div class="screen active" id="welcomeScreen">
+        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div class="text-8xl mb-6 emoji-bounce">💸</div>
+            <h1 class="text-4xl font-black mb-3">Split bills<br><span style="color: var(--primary);">in seconds</span></h1>
+            <p class="text-lg mb-8" style="color: var(--text-secondary);">No accounts. No downloads.<br>Just scan, claim, and pay.</p>
+            <div class="w-full max-w-sm space-y-4">
+                <button class="btn btn-primary w-full text-xl" onclick="createRoom()">🆕 New Split</button>\n                <button class="btn btn-outline w-full" onclick="showJoin()">🔗 Join Split</button>\n            </div>
+        </div>
+    </div>
+
+    <!-- Screen 2: Join Modal -->
+    <div class="modal" id="joinModal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Enter Room Code</h3>
+            <div class="flex gap-2 justify-center mb-6">
+                <input type="text" class="pin-input" id="p1" maxlength="1" oninput="nextPin(1)">
+                <input type="text" class="pin-input" id="p2" maxlength="1" oninput="nextPin(2)">
+                <input type="text" class="pin-input" id="p3" maxlength="1" oninput="nextPin(3)">
+                <input type="text" class="pin-input" id="p4" maxlength="1" oninput="nextPin(4)">
+                <input type="text" class="pin-input" id="p5" maxlength="1" oninput="nextPin(5)">
+                <input type="text" class="pin-input" id="p6" maxlength="1" oninput="joinRoom()">
+            </div>
+            <div class="flex gap-3">
+                <button class="btn btn-outline flex-1" onclick="hideJoin()">Cancel</button>
+                <button class="btn btn-primary flex-1" onclick="joinRoom()">Join</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 3: Name/Avatar -->
+    <div class="modal" id="nameModal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Who are you?</h3>
+            <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
+            <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
+            <button class="btn btn-primary w-full" onclick="setUser()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Screen 4: Lobby -->
+    <div class="screen" id="lobbyScreen">
+        <div class="pt-20 px-6">
+            <div class="text-center mb-6">
+                <div class="text-sm mb-2" style="color: var(--text-secondary);">ROOM CODE</div>
+                <div class="text-5xl font-black font-mono tracking-widest mb-4" id="lobbyCode" style="color: var(--warning);"></div>
+                <div class="text-sm" style="color: var(--text-secondary);">Share this code with friends</div>
+            </div>
+            <div class="card mb-6">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">Who's here:</div>
+                <div class="avatar-grid" id="playerList"></div>
+            </div>
+            <div class="space-y-3">
+                <button class="btn btn-success w-full" id="startBtn" onclick="goToReceipt()" style="display: none;">Start Splitting</button>
+                <button class="btn btn-outline w-full" onclick="leaveRoom()">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 5: Receipt -->
+    <div class="screen" id="receiptScreen">
+        <div class="pt-20 px-6 flex-1 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4">Add Receipt</h2>
+            <div class="flex gap-2 mb-4">
+                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px; background: var(--primary);">Paste</button>
+                <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('manual')" id="tab-manual" style="min-height: 44px;">Manual</button>
+            </div>
+            <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...\n\nExample:\n2x Chicken Wings $24.00\nCaesar Salad $12.50\nTax $3.65\nTip $8.00\nTotal $48.15"></textarea>
+            <div id="manualInput" class="hidden">
+                <input type="text" class="input" id="manualName" placeholder="Item name">
+                <input type="number" class="input" id="manualPrice" placeholder="Price" step="0.01">
+                <button class="btn btn-outline w-full mb-4" onclick="addManualItem()">Add Item</button>
+            </div>
+            <div class="card mb-4 max-h-48 overflow-y-auto" id="previewBox">
+                <div class="text-center py-8" style="color: var(--text-secondary);">Receipt preview will appear here</div>
+            </div>
+            <button class="btn btn-success w-full mb-6" onclick="processReceipt()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Screen 6: Item Selection -->
+    <div class="screen" id="selectScreen">
+        <div class="pt-20 px-6 flex-1 flex flex-col">
+            <div class="mb-4">
+                <h2 class="text-xl font-bold">Claim Your Items</h2>
+                <div class="progress-bar mt-2">
+                    <div class="progress-fill" id="claimProgress" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="card orphan-glow mb-4 hidden" id="orphanAlert">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">⚠️</span>
+                    <span><strong id="orphanCount">0</strong> items still need to be claimed!</span>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-3 pb-4" id="itemsList"></div>
+            <div class="pt-4 pb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <span style="color: var(--text-secondary);">Your Total:</span>\n                    <span class="text-2xl font-black" style="color: var(--success);" id="runningTotal">$0.00</span>
+                </div>
+                <button class="btn btn-success w-full" onclick="reviewSplit()">Review Split →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 7: Personal Review -->
+    <div class="screen" id="reviewScreen">
+        <div class="pt-20 px-6">
+            <h2 class="text-2xl font-bold mb-6 text-center">Your Split</h2>
+            <div class="text-center mb-6">
+                <div class="text-6xl font-black mb-2" style="color: var(--success);" id="yourTotalDisplay">$0.00</div>
+                <div style="color: var(--text-secondary);">You owe</div>
+            </div>
+            <div class="card mb-6">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">YOUR ITEMS:</div>
+                <div id="yourItems" class="space-y-2"></div>
+                <div class="border-t mt-4 pt-4 space-y-2" style="border-color: var(--border);">
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal</span><span id="yourSubtotal">$0.00</span></div>
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax</span><span id="yourTax">$0.00</span></div>
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Tip</span><span id="yourTip">$0.00</span></div>
+                </div>
+            </div>
+            <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good ✓</button>
+        </div>
+    </div>
+
+    <!-- Screen 8: Group Settlement -->
+    <div class="screen" id="finalScreen">
+        <div class="pt-20 px-6">
+            <h2 class="text-2xl font-bold mb-6">Final Split</h2>
+            <div id="finalLeaderboard" class="space-y-3 mb-6"></div>
+            <div class="card mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span style="color: var(--text-secondary);">Total Bill</span>
+                    <span class="font-bold" id="billTotal">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span style="color: var(--text-secondary);">Split between</span>
+                    <span id="splitCountDisplay">0 people</span>
+                </div>
+            </div>
+            <button class="btn btn-outline w-full" onclick="resetApp()">Start New Split</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SPLITT - Logic & State
+         */
+
+        class ReceiptParser {
+          constructor() {
+            this.patterns = {
+              price: /[$€£]?\s*(\d{1,3}(?:[,\.]\d{3})*|\d+)(?:[\.,](\d{2}))?/,
+              quantity: /^(\d+)\s*[@x×\*]\s*|^@?\s*(\d+)\s*[:\-]?\s*|^qty[:\s]*(\d+)/i,
+              itemLine: /^(?:(\d+)\s*[@x×\*]\s*)?(.+?)(?:\s+[$€£]?(\d[0-9,\.]+)\s*$)/i,
+              subtotal: /^(?:sub[-\s]?total|subttl|before\s*tax|net|pre[-\s]?tax)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
+              tax: /^(?:tax|vat|gst|hst|sales\s*tax)(?:\s*\(?\d*[%\s)]*)?[:\s]*[$€£]?(\d[0-9,\.]+)/i,
+              tip: /^(?:tip|gratuity|service\s*charge)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
+              total: /^(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
+              skip: /^(?:receipt|invoice|order|ticket|cashier|server|table|guest|thank|call|visit|www\.|http|tel|phone|fax|email)/i
+            };
+          }
+
+          parseReceiptText(text) {
+            if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            const itemLines = lines.filter(line => !this.patterns.skip.test(line));
+            
+            let items = [];
+            let tax = 0, tip = 0, total = 0;
+
+            for (const line of itemLines) {
+                const taxMatch = line.match(this.patterns.tax);
+                if (taxMatch) { tax = parseFloat(taxMatch[1]); continue; }
+                
+                const tipMatch = line.match(this.patterns.tip);
+                if (tipMatch) { tip = parseFloat(tipMatch[1]); continue; }
+                
+                const totalMatch = line.match(this.patterns.total);
+                if (totalMatch) { total = parseFloat(totalMatch[1]); continue; }
+
+                const itemMatch = line.match(this.patterns.itemLine);
+                if (itemMatch) {
+                    const qty = parseInt(itemMatch[1] || "1");
+                    const name = itemMatch[2].trim();
+                    const price = parseFloat(itemMatch[3]);
+                    if (name.length > 1 && !isNaN(price)) {
+                        items.push({ name, price, quantity: qty });
+                    }
+                }
+            }
+            return { items, tax, tip, total };
+          }
+        }
+
         const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆'];
+        const parser = new ReceiptParser();
         
-        let appState = {
+        let state = {
             roomCode: null,
             userId: null,
             userName: null,
             userEmoji: null,
             isHost: false,
-            session: null,
-            selectedItem: null,
-            tempUnits: 0
+            session: {
+                participants: [],
+                items: [],
+                tax: 0,
+                tip: 0,
+                selections: {}, // itemId -> Array of {userId, type, value}
+                status: 'lobby',
+                lastModified: 0
+            }
         };
 
-        // Initialize
         window.onload = () => {
             loadSession();
-            initAvatars();
-            startSyncLoop();
+            initEmojiGrid();
+            startSync();
         };
 
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-        }
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+        function generateCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-        function generateRoomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            let code = '';
-            for (let i = 0; i < 6; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return code;
-        }
-
-        // Session Management
         function loadSession() {
-            const saved = localStorage.getItem('splitt_current');
+            const saved = localStorage.getItem('splitt_user_state');
             if (saved) {
-                appState = JSON.parse(saved);
-                if (appState.session) {
-                    const sessionData = localStorage.getItem(`splitt_${appState.roomCode}`);
-                    if (sessionData) {
-                        appState.session = JSON.parse(sessionData);
-                    }
+                const parsed = JSON.parse(saved);
+                if (parsed.roomCode) {
+                    state = parsed;
+                    const roomData = localStorage.getItem('room_' + state.roomCode);
+                    if (roomData) state.session = JSON.parse(roomData);
+                    showScreen(state.session.status === 'lobby' ? 'lobby' : (state.session.status === 'selecting' ? 'select' : 'final'));
+                    updateUI();
                 }
             }
         }
 
         function saveSession() {
-            localStorage.setItem('splitt_current', JSON.stringify(appState));
-            if (appState.session) {
-                localStorage.setItem(`splitt_${appState.roomCode}`, JSON.stringify(appState.session));
-            }
+            state.session.lastModified = Date.now();
+            localStorage.setItem('splitt_user_state', JSON.stringify(state));
+            localStorage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
         }
 
-        function startSyncLoop() {
+        function startSync() {
             setInterval(() => {
-                if (appState.roomCode && !appState.isHost) {
-                    const data = localStorage.getItem(`splitt_${appState.roomCode}`);
+                if (state.roomCode) {
+                    const data = localStorage.getItem('room_' + state.roomCode);
                     if (data) {
-                        const newSession = JSON.parse(data);
-                        if (newSession.lastModified > appState.session?.lastModified) {
-                            appState.session = newSession;
+                        const parsed = JSON.parse(data);
+                        if (parsed.lastModified > state.session.lastModified) {
+                            state.session = parsed;
                             updateUI();
                         }
                     }
@@ -68,506 +320,233 @@
             }, 1000);
         }
 
-        // Navigation
-        function showScreen(screenId) {
+        function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId + 'Screen').classList.add('active');
+            document.getElementById(id + 'Screen').classList.add('active');
+            document.getElementById('nav').style.display = id === 'welcome' ? 'none' : 'flex';
         }
 
-        // Welcome
         function createRoom() {
-            appState.roomCode = generateRoomCode();
-            appState.isHost = true;
-            appState.userId = generateId();
-            showScreen('name');
+            state.roomCode = generateCode();
+            state.isHost = true;
+            state.userId = generateId();
+            showNameModal();
         }
 
-        function showJoin() {
-            showScreen('join');
-            setTimeout(() => document.getElementById('code1').focus(), 100);
-        }
-
-        // Join Code
-        function nextCode(n) {
-            if (n < 6) document.getElementById(`code${n+1}`).focus();
-        }
+        function showJoin() { document.getElementById('joinModal').classList.add('active'); document.getElementById('p1').focus(); }
+        function hideJoin() { document.getElementById('joinModal').classList.remove('active'); }
+        function nextPin(n) { if (n < 6) document.getElementById('p' + (n + 1)).focus(); }
 
         function joinRoom() {
-            const code = Array.from({length: 6}, (_, i) => document.getElementById(`code${i+1}`).value).join('').toUpperCase();
-            if (code.length !== 6) return;
-            
-            const sessionData = localStorage.getItem(`splitt_${code}`);
-            if (!sessionData) {
-                alert('Room not found!');
-                return;
-            }
-            
-            appState.roomCode = code;
-            appState.isHost = false;
-            appState.userId = generateId();
-            appState.session = JSON.parse(sessionData);
-            showScreen('name');
+            const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
+            if (code.length < 6) return;
+            if (!localStorage.getItem('room_' + code)) return alert('Room not found!');
+            state.roomCode = code;
+            state.isHost = false;
+            state.userId = generateId();
+            hideJoin();
+            showNameModal();
         }
 
-        // Avatar Selection
-        function initAvatars() {
-            const grid = document.getElementById('avatarGrid');
-            EMOJIS.forEach((emoji, i) => {
-                const div = document.createElement('div');
-                div.className = `avatar cursor-pointer ${i === 0 ? 'active' : ''}`;
-                div.textContent = emoji;
-                div.onclick = () => {
-                    document.querySelectorAll('#avatarGrid .avatar').forEach(a => a.classList.remove('active'));
-                    div.classList.add('active');
-                    appState.userEmoji = emoji;
+        function showNameModal() { document.getElementById('nameModal').classList.add('active'); }
+        function initEmojiGrid() {
+            const grid = document.getElementById('emojiGrid');
+            EMOJIS.forEach((e, i) => {
+                const d = document.createElement('div');
+                d.className = 'avatar cursor-pointer' + (i === 0 ? ' me' : '');
+                d.textContent = e;
+                d.onclick = () => {
+                    document.querySelectorAll('#emojiGrid .avatar').forEach(a => a.classList.remove('me'));
+                    d.classList.add('me');
+                    state.userEmoji = e;
                 };
-                grid.appendChild(div);
+                grid.appendChild(d);
             });
-            appState.userEmoji = EMOJIS[0];
+            state.userEmoji = EMOJIS[0];
         }
 
         function setUser() {
             const name = document.getElementById('userName').value.trim();
-            if (!name) return alert('Enter your name!');
-            
-            appState.userName = name;
-            
-            if (!appState.session) {
-                // Creating new session
-                appState.session = {
-                    roomCode: appState.roomCode,
-                    hostId: appState.userId,
-                    status: 'lobby',
-                    createdAt: Date.now(),
-                    participants: [],
-                    items: [],
-                    tax: 0,
-                    tip: 0,
-                    selections: {},
-                    lastModified: Date.now()
-                };
-            }
-            
-            // Add participant
-            appState.session.participants.push({
-                id: appState.userId,
-                name: appState.userName,
-                emoji: appState.userEmoji,
-                isHost: appState.isHost
-            });
-            
+            if (!name) return;
+            state.userName = name;
+            state.session.participants.push({ id: state.userId, name, emoji: state.userEmoji, isHost: state.isHost });
+            document.getElementById('nameModal').classList.remove('active');
+            document.getElementById('roomDisplay').textContent = state.roomCode;
             saveSession();
             showLobby();
         }
 
-        // Lobby
         function showLobby() {
             showScreen('lobby');
-            document.getElementById('lobbyCode').textContent = appState.roomCode;
-            document.getElementById('startBtn').classList.toggle('hidden', !appState.isHost);
+            document.getElementById('lobbyCode').textContent = state.roomCode;
+            document.getElementById('startBtn').style.display = state.isHost ? 'block' : 'none';
             renderPlayers();
         }
 
         function renderPlayers() {
-            const grid = document.getElementById('playerGrid');
-            grid.innerHTML = '';
-            appState.session?.participants?.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'flex flex-col items-center';
-                div.innerHTML = `
-                    <div class="avatar mb-2 ${p.id === appState.userId ? 'active' : ''}">${p.emoji}</div>
-                    <span class="text-xs text-gray-400 text-center">${p.name}${p.isHost ? ' 👑' : ''}</span>
-                `;
-                grid.appendChild(div);
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            state.session.participants.forEach(p => {
+                const d = document.createElement('div');
+                d.className = 'flex flex-col items-center gap-1';
+                d.innerHTML = `<div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div><div class="text-xs text-gray-400">${p.name}</div>`;
+                list.appendChild(d);
             });
         }
 
-        function startGame() {
-            appState.session.status = 'selecting';
-            appState.session.lastModified = Date.now();
-            saveSession();
-            showScreen('receipt');
+        function goToReceipt() { state.session.status = 'receipt'; saveSession(); showScreen('receipt'); }
+
+        function setTab(t) {
+            document.getElementById('pasteSection').classList.toggle('hidden', t !== 'paste');
+            document.getElementById('manualInput').classList.toggle('hidden', t !== 'manual');
+            document.getElementById('tab-paste').style.background = t === 'paste' ? 'var(--primary)' : 'transparent';
+            document.getElementById('tab-manual').style.background = t === 'manual' ? 'var(--primary)' : 'transparent';
         }
 
-        function leaveRoom() {
-            localStorage.removeItem('splitt_current');
-            location.reload();
-        }
-
-        // Receipt Parsing
-        function parseReceipt() {
+        function processReceipt() {
             const text = document.getElementById('receiptText').value;
-            if (!text.trim()) return alert('Paste receipt text first!');
-            
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-            const items = [];
-            let tax = 0, tip = 0;
-            
-            lines.forEach(line => {
-                // Match patterns like "2x Wings $24.00" or "Wings $12.00"
-                const match = line.match(/(\d+)x?\s+(.+?)\s+\$?([\d.]+)/i);
-                if (match) {
-                    const qty = parseInt(match[1]) || 1;
-                    const name = match[2].trim();
-                    const price = parseFloat(match[3]);
-                    
-                    if (name.toLowerCase().includes('tax')) tax = price;
-                    else if (name.toLowerCase().includes('tip')) tip = price;
-                    else if (!name.toLowerCase().includes('total')) {
-                        items.push({ id: generateId(), name, price, quantity: qty, claimed: false });
-                    }
-                }
-            });
-            
-            appState.session.items = items;
-            appState.session.tax = tax;
-            appState.session.tip = tip;
-            appState.session.selections = {};
+            const parsed = parser.parseReceiptText(text);
+            state.session.items = parsed.items.map((it, i) => ({ ...it, id: 'it_' + i }));
+            state.session.tax = parsed.tax;
+            state.session.tip = parsed.tip;
+            state.session.status = 'selecting';
             saveSession();
-            showReview();
+            showSelection();
         }
 
-        // Review Items
-        function showReview() {
-            showScreen('review');
+        function showSelection() {
+            showScreen('select');
+            renderItems();
+        }
+
+        function renderItems() {
             const list = document.getElementById('itemsList');
             list.innerHTML = '';
-            
-            appState.session.items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'item-card';
-                div.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
-                            <div class="text-sm text-gray-400">$${item.price.toFixed(2)}</div>
-                        </div>
-                        <button class="btn btn-outline btn-small" onclick="editItem('${item.id}')">✏️</button>
-                    </div>
-                `;
-                list.appendChild(div);
-            });
-        }
+            let mySub = 0;
+            let orphans = 0;
 
-        function goToDraft() {
-            appState.session.status = 'selecting';
-            appState.session.lastModified = Date.now();
-            saveSession();
-            showDraft();
-        }
+            state.session.items.forEach(it => {
+                const selections = state.session.selections[it.id] || [];
+                const mySel = selections.find(s => s.userId === state.userId);
+                if (selections.length === 0) orphans++;
 
-        // Draft / Item Selection
-        function showDraft() {
-            showScreen('draft');
-            renderDraft();
-        }
-
-        function renderDraft() {
-            const list = document.getElementById('draftList');
-            list.innerHTML = '';
-            
-            let claimedCount = 0;
-            let orphanCount = 0;
-            let myTotal = 0;
-            
-            appState.session.items.forEach(item => {
-                const selections = appState.session.selections[item.id] || [];
-                const mySelection = selections.find(s => s.userId === appState.userId);
-                const isClaimed = selections.length > 0;
-                const isOrphan = !isClaimed;
-                
-                if (isClaimed) claimedCount++;
-                if (isOrphan) orphanCount++;
-                
-                // Calculate my share
-                if (mySelection) {
-                    if (mySelection.type === 'solo') myTotal += item.price;
-                    else if (mySelection.type === 'even') myTotal += item.price / selections.length;
-                    else if (mySelection.type === 'unit') {
-                        myTotal += (mySelection.value / item.quantity) * item.price;
-                    }
-                }
-                
-                const div = document.createElement('div');
-                div.className = `item-card ${isOrphan ? 'unclaimed' : ''}`;
-                
-                let claimantsHtml = '';
-                if (selections.length > 0) {
-                    claimantsHtml = `<div class="flex gap-2 mt-2">` + selections.map(s => {
-                        const p = appState.session.participants.find(x => x.id === s.userId);
-                        let label = s.type === 'solo' ? 'solo' : s.type === 'even' ? 'split' : `${s.value}/${item.quantity}`;
-                        return `<span class="text-xs bg-gray-800 px-2 py-1 rounded">${p?.emoji || '?'} ${label}</span>`;
-                    }).join('') + `</div>`;
-                }
-                
-                let actionsHtml = '';
-                if (mySelection) {
-                    actionsHtml = `<button class="btn btn-error text-sm py-2" onclick="unclaimItem('${item.id}')">Remove</button>`;
-                } else if (!selections.find(s => s.type === 'solo')) {
-                    actionsHtml = `
-                        <button class="btn btn-success text-sm py-2" onclick="showSplitModal('${item.id}')">Claim</button>
-                    `;
-                } else {
-                    actionsHtml = `<span class="text-sm text-gray-500">Solo claimed</span>`;
-                }
-                
-                div.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
-                            <div class="text-green-400 font-bold">$${item.price.toFixed(2)}</div>
-                            ${claimantsHtml}
-                        </div>
-                        <div>${actionsHtml}</div>
-                    </div>
-                `;
-                list.appendChild(div);
-            });
-            
-            // Update progress
-            document.getElementById('draftProgress').textContent = `${claimedCount}/${appState.session.items.length} claimed`;
-            document.getElementById('orphanAlert').classList.toggle('hidden', orphanCount === 0);
-            document.getElementById('orphanCount').textContent = orphanCount;
-            
-            // Calculate with tax/tip
-            const subtotal = myTotal;
-            const totalFood = appState.session.items.reduce((sum, i) => sum + i.price, 0);
-            const myTax = totalFood > 0 ? (subtotal / totalFood) * appState.session.tax : 0;
-            const myTip = totalFood > 0 ? (subtotal / totalFood) * appState.session.tip : 0;
-            const total = subtotal + myTax + myTip;
-            
-            document.getElementById('runningTotal').textContent = '$' + total.toFixed(2);
-        }
-
-        function showSplitModal(itemId) {
-            appState.selectedItem = itemId;
-            const item = appState.session.items.find(i => i.id === itemId);
-            document.getElementById('unitBtn').classList.toggle('hidden', item.quantity <= 1);
-            document.getElementById('splitModal').classList.add('active');
-        }
-
-        function closeModal() {
-            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-            appState.selectedItem = null;
-        }
-
-        function claimItem(type) {
-            if (!appState.selectedItem) return;
-            
-            const itemId = appState.selectedItem;
-            
-            if (type === 'unit') {
-                showUnitSplit();
-                return;
-            }
-            
-            if (!appState.session.selections[itemId]) {
-                appState.session.selections[itemId] = [];
-            }
-            
-            // Remove existing selection for this user
-            appState.session.selections[itemId] = appState.session.selections[itemId].filter(s => s.userId !== appState.userId);
-            
-            // If solo, clear others
-            if (type === 'solo') {
-                appState.session.selections[itemId] = [];
-            }
-            
-            appState.session.selections[itemId].push({
-                userId: appState.userId,
-                type: type,
-                value: type === 'even' ? null : 1
-            });
-            
-            appState.session.lastModified = Date.now();
-            saveSession();
-            closeModal();
-            renderDraft();
-        }
-
-        function unclaimItem(itemId) {
-            if (appState.session.selections[itemId]) {
-                appState.session.selections[itemId] = appState.session.selections[itemId].filter(s => s.userId !== appState.userId);
-                if (appState.session.selections[itemId].length === 0) {
-                    delete appState.session.selections[itemId];
-                }
-                appState.session.lastModified = Date.now();
-                saveSession();
-                renderDraft();
-            }
-        }
-
-        // Unit Split
-        function showUnitSplit() {
-            const item = appState.session.items.find(i => i.id === appState.selectedItem);
-            document.getElementById('totalUnits').textContent = item.quantity;
-            document.getElementById('myUnits').textContent = '0';
-            document.getElementById('unitShare').textContent = '0.00';
-            appState.tempUnits = 0;
-            closeModal();
-            document.getElementById('unitModal').classList.add('active');
-        }
-
-        function adjustUnit(delta) {
-            const item = appState.session.items.find(i => i.id === appState.selectedItem);
-            appState.tempUnits = Math.max(0, Math.min(item.quantity, appState.tempUnits + delta));
-            document.getElementById('myUnits').textContent = appState.tempUnits;
-            const share = (appState.tempUnits / item.quantity) * item.price;
-            document.getElementById('unitShare').textContent = share.toFixed(2);
-        }
-
-        function confirmUnitClaim() {
-            if (appState.tempUnits === 0) {
-                closeModal();
-                return;
-            }
-            
-            const itemId = appState.selectedItem;
-            if (!appState.session.selections[itemId]) {
-                appState.session.selections[itemId] = [];
-            }
-            
-            appState.session.selections[itemId] = appState.session.selections[itemId].filter(s => s.userId !== appState.userId);
-            appState.session.selections[itemId].push({
-                userId: appState.userId,
-                type: 'unit',
-                value: appState.tempUnits
-            });
-            
-            appState.session.lastModified = Date.now();
-            saveSession();
-            closeModal();
-            renderDraft();
-        }
-
-        // Review Split
-        function reviewSplit() {
-            showPersonalReview();
-        }
-
-        function showPersonalReview() {
-            showScreen('personalReview');
-            
-            let mySubtotal = 0;
-            const myItems = [];
-            
-            appState.session.items.forEach(item => {
-                const selections = appState.session.selections[item.id] || [];
-                const mySel = selections.find(s => s.userId === appState.userId);
-                
                 if (mySel) {
-                    let amount = 0;
-                    if (mySel.type === 'solo') amount = item.price;
-                    else if (mySel.type === 'even') amount = item.price / selections.length;
-                    else if (mySel.type === 'unit') amount = (mySel.value / item.quantity) * item.price;
-                    
-                    mySubtotal += amount;
-                    myItems.push({ name: item.name, amount, type: mySel.type });
+                    if (mySel.type === 'solo') mySub += it.price;
+                    else mySub += it.price / selections.length;
                 }
-            });
-            
-            const totalFood = appState.session.items.reduce((sum, i) => sum + i.price, 0);
-            const myTax = totalFood > 0 ? (mySubtotal / totalFood) * appState.session.tax : 0;
-            const myTip = totalFood > 0 ? (mySubtotal / totalFood) * appState.session.tip : 0;
-            const total = mySubtotal + myTax + myTip;
-            
-            document.getElementById('personalTotal').textContent = '$' + total.toFixed(2);
-            
-            const list = document.getElementById('personalItems');
-            list.innerHTML = '';
-            
-            myItems.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between py-2 border-b border-gray-800';
-                div.innerHTML = `
-                    <span class="text-gray-400">${item.name} <span class="text-xs">(${item.type})</span></span>
-                    <span class="font-bold">$${item.amount.toFixed(2)}</span>
-                `;
-                list.appendChild(div);
-            });
-            
-            // Add tax/tip
-            if (myTax > 0) {
-                list.innerHTML += `<div class="flex justify-between py-2 text-gray-400"><span>Tax</span><span>$${myTax.toFixed(2)}</span></div>`;
-            }
-            if (myTip > 0) {
-                list.innerHTML += `<div class="flex justify-between py-2 text-gray-400"><span>Tip</span><span>$${myTip.toFixed(2)}</span></div>`;
-            }
-        }
 
-        // Group Summary
-        function showGroupSummary() {
-            showScreen('summary');
-            const container = document.getElementById('groupSummary');
-            container.innerHTML = '';
-            
-            const totals = [];
-            
-            appState.session.participants.forEach(p => {
-                let subtotal = 0;
-                
-                appState.session.items.forEach(item => {
-                    const selections = appState.session.selections[item.id] || [];
-                    const sel = selections.find(s => s.userId === p.id);
-                    
-                    if (sel) {
-                        if (sel.type === 'solo') subtotal += item.price;
-                        else if (sel.type === 'even') subtotal += item.price / selections.length;
-                        else if (sel.type === 'unit') subtotal += (sel.value / item.quantity) * item.price;
-                    }
-                });
-                
-                const totalFood = appState.session.items.reduce((sum, i) => sum + i.price, 0);
-                const tax = totalFood > 0 ? (subtotal / totalFood) * appState.session.tax : 0;
-                const tip = totalFood > 0 ? (subtotal / totalFood) * appState.session.tip : 0;
-                
-                totals.push({
-                    participant: p,
-                    subtotal,
-                    tax,
-                    tip,
-                    total: subtotal + tax + tip
-                });
-            });
-            
-            totals.sort((a, b) => b.total - a.total);
-            
-            totals.forEach((t, i) => {
-                const div = document.createElement('div');
-                div.className = 'item-card mb-3';
-                div.innerHTML = `
-                    <div class="flex items-center gap-4">
-                        <div class="text-2xl">${t.participant.emoji}</div>
-                        <div class="flex-1">
-                            <div class="font-bold">${t.participant.name}${t.participant.id === appState.userId ? ' (You)' : ''}</div>
-                            <div class="text-xs text-gray-400">${i === 0 ? '👑 Highest' : ''}</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-2xl font-black text-green-400">$${t.total.toFixed(2)}</div>
-                            ${t.participant.id !== appState.userId ? `<a href="venmo://paycharge?txn=pay&amount=${t.total.toFixed(2)}&note=SPLITT" class="text-xs text-blue-400">Pay with Venmo</a>` : ''}
-                        </div>
+                const d = document.createElement('div');
+                d.className = 'item-card ' + (selections.length === 0 ? 'unclaimed' : '');
+                let claimants = selections.map(s => {
+                    const p = state.session.participants.find(x => x.id === s.userId);
+                    return `<span class="claimant-tag"><span>${p?.emoji || '?'}</span>${p?.name || 'User'}</span>`;
+                }).join('');
+
+                d.innerHTML = `
+                    <div class="flex justify-between mb-2">
+                        <div class="font-bold">${it.quantity > 1 ? it.quantity+'x ' : ''}${it.name}</div>
+                        <div class="text-green-400 font-bold">$${it.price.toFixed(2)}</div>
+                    </div>
+                    <div class="mb-3">${claimants}</div>
+                    <div class="flex gap-2">
+                        ${mySel ? `<button class="btn btn-outline flex-1 text-sm py-2" style="min-height: 44px; color: var(--error);" onclick="unclaim('${it.id}')">Remove</button>` : `
+                        <button class="btn btn-success flex-1 text-sm py-2" style="min-height: 44px;" onclick="claim('${it.id}', 'solo')">Solo</button>
+                        <button class="btn btn-primary flex-1 text-sm py-2" style="min-height: 44px;" onclick="claim('${it.id}', 'even')">Split</button>
+                        `}
                     </div>
                 `;
-                container.appendChild(div);
+                list.appendChild(d);
             });
+
+            const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
+            const myShare = totalFood > 0 ? (mySub / totalFood) : 0;
+            const myTotal = mySub + (state.session.tax * myShare) + (state.session.tip * myShare);
+            document.getElementById('runningTotal').textContent = '$' + myTotal.toFixed(2);
+            
+            document.getElementById('orphanAlert').classList.toggle('hidden', orphans === 0);
+            document.getElementById('orphanCount').textContent = orphans;
+            const progress = state.session.items.length > 0 ? ((state.session.items.length - orphans) / state.session.items.length) * 100 : 0;
+            document.getElementById('claimProgress').style.width = progress + '%';
         }
 
-        function resetApp() {
-            localStorage.removeItem('splitt_current');
-            if (appState.roomCode) {
-                localStorage.removeItem(`splitt_${appState.roomCode}`);
-            }
-            location.reload();
+        function claim(id, type) {
+            if (!state.session.selections[id]) state.session.selections[id] = [];
+            if (type === 'solo') state.session.selections[id] = [];
+            state.session.selections[id].push({ userId: state.userId, type });
+            saveSession();
+            renderItems();
         }
 
-        function updateUI() {
-            // Auto-refresh based on session status
-            if (appState.session?.status === 'selecting' && document.getElementById('lobbyScreen').classList.contains('active')) {
-                showDraft();
+        function unclaim(id) {
+            if (state.session.selections[id]) {
+                state.session.selections[id] = state.session.selections[id].filter(s => s.userId !== state.userId);
+                saveSession();
+                renderItems();
             }
-            if (appState.screen === 'lobby') renderPlayers();
-            if (appState.screen === 'draft') renderDraft();
         }
+
+        function reviewSplit() {
+            showScreen('review');
+            let mySub = 0;
+            const itemsList = document.getElementById('yourItems');
+            itemsList.innerHTML = '';
+
+            state.session.items.forEach(it => {
+                const selections = state.session.selections[it.id] || [];
+                const mySel = selections.find(s => s.userId === state.userId);
+                if (mySel) {
+                    let amt = mySel.type === 'solo' ? it.price : it.price / selections.length;
+                    mySub += amt;
+                    itemsList.innerHTML += `<div class="flex justify-between text-sm"><span>${it.name}</span><span>$${amt.toFixed(2)}</span></div>`;
+                }
+            });
+
+            const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
+            const myShare = totalFood > 0 ? (mySub / totalFood) : 0;
+            const tax = state.session.tax * myShare;
+            const tip = state.session.tip * myShare;
+            
+            document.getElementById('yourSubtotal').textContent = '$' + mySub.toFixed(2);
+            document.getElementById('yourTax').textContent = '$' + tax.toFixed(2);
+            document.getElementById('yourTip').textContent = '$' + tip.toFixed(2);
+            document.getElementById('yourTotalDisplay').textContent = '$' + (mySub + tax + tip).toFixed(2);
+        }
+
+        function goToFinal() { state.session.status = 'final'; saveSession(); showScreen('final'); renderFinal(); }
+
+        function renderFinal() {
+            const list = document.getElementById('finalLeaderboard');
+            list.innerHTML = '';
+            const totals = state.session.participants.map(p => {
+                let sub = 0;
+                state.session.items.forEach(it => {
+                    const sels = state.session.selections[it.id] || [];
+                    const s = sels.find(x => x.userId === p.id);
+                    if (s) sub += (s.type === 'solo' ? it.price : it.price / sels.length);
+                });
+                const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
+                const share = totalFood > 0 ? (sub / totalFood) : 0;
+                return { ...p, total: sub + (state.session.tax * share) + (state.session.tip * share) };
+            }).sort((a, b) => b.total - a.total);
+
+            totals.forEach((t, i) => {
+                list.innerHTML += `
+                    <div class="card flex items-center gap-4">
+                        <div class="text-2xl font-black text-purple-500 w-8">#${i+1}</div>
+                        <div class="avatar">${t.emoji}</div>
+                        <div class="flex-1 font-bold">${t.name}</div>
+                        <div class="text-xl font-black text-green-400">$${t.total.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            
+            const totalBill = state.session.items.reduce((a, b) => a + b.price, 0) + state.session.tax + state.session.tip;
+            document.getElementById('billTotal').textContent = '$' + totalBill.toFixed(2);
+            document.getElementById('splitCountDisplay').textContent = state.session.participants.length + ' people';
+        }
+
+        function resetApp() { localStorage.clear(); location.reload(); }
+        function updateUI() { if (state.session.status === 'lobby') renderPlayers(); else if (state.session.status === 'selecting') renderItems(); }
     </script>
 </body>
 </html>
