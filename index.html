@@ -1,0 +1,537 @@
+        // State
+        let currentRoom = null;
+        let currentUser = null;
+        let currentItem = null;
+        let unitData = { myUnits: 0, totalUnits: 1, price: 0 };
+
+        const emojis = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆'];
+        let selectedEmoji = emojis[0];
+
+        // Initialize
+        window.onload = () => {
+            initAvatars();
+            loadSavedSession();
+        };
+
+        function initAvatars() {
+            const grid = document.getElementById('avatarGrid');
+            emojis.forEach((emoji, i) => {
+                const div = document.createElement('div');
+                div.className = `avatar cursor-pointer ${i === 0 ? 'active' : ''}`;
+                div.textContent = emoji;
+                div.onclick = () => {
+                    document.querySelectorAll('#avatarGrid .avatar').forEach(a => a.classList.remove('active'));
+                    div.classList.add('active');
+                    selectedEmoji = emoji;
+                };
+                grid.appendChild(div);
+            });
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id + 'Screen').classList.add('active');
+        }
+
+        // Room Management
+        function createRoom() {
+            currentRoom = {
+                code: generateCode(),
+                host: null,
+                participants: [],
+                items: [],
+                tax: 0,
+                tip: 0,
+                status: 'lobby'
+            };
+            showScreen('name');
+        }
+
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            return Array.from({length: 6}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        }
+
+        function showJoin() {
+            showScreen('join');
+            setTimeout(() => document.getElementById('code1').focus(), 100);
+        }
+
+        function nextCode(n) {
+            if (n < 6) document.getElementById('code' + (n + 1)).focus();
+        }
+
+        function joinRoom() {
+            const code = Array.from({length: 6}, (_, i) => document.getElementById('code' + (i + 1)).value).join('').toUpperCase();
+            if (code.length !== 6) return;
+            
+            const saved = localStorage.getItem('splitt_room_' + code);
+            if (!saved) {
+                alert('Room not found!');
+                return;
+            }
+            
+            currentRoom = JSON.parse(saved);
+            currentRoom.code = code;
+            showScreen('name');
+        }
+
+        function setUser() {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) return;
+            
+            currentUser = {
+                id: Date.now().toString(),
+                name,
+                emoji: selectedEmoji
+            };
+            
+            if (!currentRoom.host) {
+                currentRoom.host = currentUser.id;
+            }
+            currentRoom.participants.push(currentUser);
+            saveRoom();
+            
+            showScreen('lobby');
+            updateLobby();
+            startSync();
+        }
+
+        function updateLobby() {
+            document.getElementById('lobbyCode').textContent = currentRoom.code;
+            const grid = document.getElementById('playerGrid');
+            grid.innerHTML = '';
+            
+            currentRoom.participants.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'flex flex-col items-center gap-2';
+                div.innerHTML = `
+                    <div class="avatar ${p.id === currentUser.id ? 'active' : ''}">${p.emoji}</div>
+                    <span class="text-xs text-gray-400">${p.name}${p.id === currentRoom.host ? ' 👑' : ''}</span>
+                `;
+                grid.appendChild(div);
+            });
+            
+            const isHost = currentUser.id === currentRoom.host;
+            document.getElementById('startBtn').classList.toggle('hidden', !isHost || currentRoom.participants.length < 2);
+        }
+
+        function startGame() {
+            currentRoom.status = 'receipt';
+            saveRoom();
+            showScreen('receipt');
+        }
+
+        function leaveRoom() {
+            currentRoom = null;
+            currentUser = null;
+            localStorage.removeItem('splitt_current');
+            showScreen('welcome');
+        }
+
+        // Receipt Parsing
+        function parseReceipt() {
+            const text = document.getElementById('receiptText').value;
+            if (!text.trim()) return;
+            
+            const lines = text.split('\n').filter(l => l.trim());
+            currentRoom.items = [];
+            
+            lines.forEach(line => {
+                // Match patterns like "2x Wings $24" or "Wings $12"
+                const match = line.match(/(\d+)\s*x?\s*(.+?)\s*\$?([\d.]+)/i);
+                if (match) {
+                    const qty = parseInt(match[1]) || 1;
+                    const name = match[2].trim();
+                    const price = parseFloat(match[3]);
+                    
+                    if (name.toLowerCase().includes('tax')) {
+                        currentRoom.tax = price;
+                    } else if (name.toLowerCase().includes('tip')) {
+                        currentRoom.tip = price;
+                    } else if (!name.toLowerCase().includes('total')) {
+                        currentRoom.items.push({
+                            id: Date.now() + Math.random().toString(),
+                            name,
+                            price,
+                            quantity: qty,
+                            claimants: []
+                        });
+                    }
+                }
+            });
+            
+            if (currentRoom.items.length === 0) {
+                alert('No items found. Try manual entry format: "2x Wings $24"');
+                return;
+            }
+            
+            showScreen('review');
+            renderItemsReview();
+        }
+
+        function renderItemsReview() {
+            const list = document.getElementById('itemsList');
+            list.innerHTML = '';
+            
+            currentRoom.items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item-card flex justify-between items-center';
+                div.innerHTML = `
+                    <div>
+                        <p class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</p>
+                    </div>
+                    <p class="text-xl font-bold text-green-400">$${item.price.toFixed(2)}</p>
+                `;
+                list.appendChild(div);
+            });
+            
+            if (currentRoom.tax || currentRoom.tip) {
+                const div = document.createElement('div');
+                div.className = 'mt-4 pt-4 border-t border-gray-800';
+                div.innerHTML = `
+                    ${currentRoom.tax ? `<div class="flex justify-between mb-2"><span class="text-gray-400">Tax</span><span>$${currentRoom.tax.toFixed(2)}</span></div>` : ''}
+                    ${currentRoom.tip ? `<div class="flex justify-between"><span class="text-gray-400">Tip</span><span>$${currentRoom.tip.toFixed(2)}</span></div>` : ''}
+                `;
+                list.appendChild(div);
+            }
+        }
+
+        function goToDraft() {
+            currentRoom.status = 'draft';
+            saveRoom();
+            showScreen('draft');
+            updateDraft();
+        }
+
+        // Draft/Selection
+        function updateDraft() {
+            const list = document.getElementById('draftList');
+            list.innerHTML = '';
+            
+            let claimedCount = 0;
+            let orphanCount = 0;
+            let myTotal = 0;
+            
+            currentRoom.items.forEach(item => {
+                const myClaim = item.claimants.find(c => c.userId === currentUser.id);
+                const isClaimed = item.claimants.length > 0;
+                const isOrphan = !isClaimed;
+                
+                if (isClaimed) claimedCount++;
+                if (isOrphan) orphanCount++;
+                
+                const div = document.createElement('div');
+                div.className = `item-card ${isOrphan ? 'unclaimed' : ''}`;
+                
+                let claimantHtml = '';
+                if (item.claimants.length > 0) {
+                    claimantHtml = `<div class="flex gap-2 mt-2">${item.claimants.map(c => {
+                        const user = currentRoom.participants.find(p => p.id === c.userId);
+                        let label = c.type === 'solo' ? '(solo)' : c.type === 'even' ? '(split)' : `(${c.units}/${item.quantity})`;
+                        return `<span class="text-xs bg-gray-800 px-2 py-1 rounded">${user?.emoji || '?'} ${label}</span>`;
+                    }).join('')}</div>`;
+                }
+                
+                let actionsHtml = '';
+                if (myClaim) {
+                    actionsHtml = `<button class="btn btn-error text-sm px-4" onclick="unclaimItem('${item.id}')">Remove</button>`;
+                } else if (!item.claimants.some(c => c.type === 'solo')) {
+                    actionsHtml = `
+                        <button class="btn btn-success text-sm px-3" onclick="showSplitModal('${item.id}')">Claim</button>
+                    `;
+                } else {
+                    actionsHtml = `<span class="text-xs text-gray-500">Solo claimed</span>`;
+                }
+                
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</p>
+                            <p class="text-green-400 font-bold">$${item.price.toFixed(2)}</p>
+                        </div>
+                        ${actionsHtml}
+                    </div>
+                    ${claimantHtml}
+                `;
+                
+                list.appendChild(div);
+                
+                // Calculate my running total
+                if (myClaim) {
+                    if (myClaim.type === 'solo') myTotal += item.price;
+                    else if (myClaim.type === 'even') myTotal += item.price / item.claimants.length;
+                    else if (myClaim.type === 'unit') myTotal += (myClaim.units / item.quantity) * item.price;
+                }
+            });
+            
+            // Tax/tip proportional
+            const subtotal = currentRoom.items.reduce((sum, i) => sum + i.price, 0);
+            const myShare = subtotal > 0 ? myTotal / subtotal : 0;
+            myTotal += (currentRoom.tax || 0) * myShare + (currentRoom.tip || 0) * myShare;
+            
+            document.getElementById('runningTotal').textContent = '$' + myTotal.toFixed(2);
+            document.getElementById('draftProgress').textContent = `${claimedCount}/${currentRoom.items.length} claimed`;
+            
+            const orphanAlert = document.getElementById('orphanAlert');
+            if (orphanCount > 0) {
+                orphanAlert.classList.remove('hidden');
+                document.getElementById('orphanCount').textContent = orphanCount;
+            } else {
+                orphanAlert.classList.add('hidden');
+            }
+        }
+
+        function showSplitModal(itemId) {
+            currentItem = currentRoom.items.find(i => i.id === itemId);
+            document.getElementById('unitBtn').classList.toggle('hidden', currentItem.quantity <= 1);
+            document.getElementById('splitModal').classList.add('active');
+        }
+
+        function showUnitSplit() {
+            closeModal();
+            unitData = { myUnits: 1, totalUnits: currentItem.quantity, price: currentItem.price };
+            document.getElementById('myUnits').textContent = unitData.myUnits;
+            document.getElementById('totalUnits').textContent = unitData.totalUnits;
+            updateUnitShare();
+            document.getElementById('unitModal').classList.add('active');
+        }
+
+        function adjustUnit(delta) {
+            unitData.myUnits = Math.max(0, Math.min(unitData.totalUnits, unitData.myUnits + delta));
+            document.getElementById('myUnits').textContent = unitData.myUnits;
+            updateUnitShare();
+        }
+
+        function updateUnitShare() {
+            const share = (unitData.myUnits / unitData.totalUnits) * unitData.price;
+            document.getElementById('unitShare').textContent = share.toFixed(2);
+        }
+
+        function confirmUnitClaim() {
+            if (unitData.myUnits === 0) {
+                closeModal();
+                return;
+            }
+            claimItem('unit', unitData.myUnits);
+            closeModal();
+        }
+
+        function claimItem(type, units = null) {
+            if (type === 'solo' && currentItem.claimants.length > 0) {
+                const other = currentItem.claimants[0];
+                const user = currentRoom.participants.find(p => p.id === other.userId);
+                if (!confirm(`${user?.name || 'Someone'} already claimed this. Override?`)) return;
+                currentItem.claimants = [];
+            }
+            
+            currentItem.claimants.push({
+                userId: currentUser.id,
+                type,
+                units
+            });
+            
+            saveRoom();
+            updateDraft();
+            closeModal();
+        }
+
+        function unclaimItem(itemId) {
+            const item = currentRoom.items.find(i => i.id === itemId);
+            if (item) {
+                item.claimants = item.claimants.filter(c => c.userId !== currentUser.id);
+                saveRoom();
+                updateDraft();
+            }
+        }
+
+        function closeModal() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        }
+
+        // Review & Summary
+        function reviewSplit() {
+            showScreen('personalReview');
+            updatePersonalReview();
+        }
+
+        function updatePersonalReview() {
+            let mySubtotal = 0;
+            const myItems = [];
+            
+            currentRoom.items.forEach(item => {
+                const claim = item.claimants.find(c => c.userId === currentUser.id);
+                if (claim) {
+                    let amount = 0;
+                    if (claim.type === 'solo') amount = item.price;
+                    else if (claim.type === 'even') amount = item.price / item.claimants.length;
+                    else if (claim.type === 'unit') amount = (claim.units / item.quantity) * item.price;
+                    
+                    mySubtotal += amount;
+                    myItems.push({ name: item.name, amount, type: claim.type });
+                }
+            });
+            
+            const subtotal = currentRoom.items.reduce((sum, i) => sum + i.price, 0);
+            const myShare = subtotal > 0 ? mySubtotal / subtotal : 0;
+            const myTax = (currentRoom.tax || 0) * myShare;
+            const myTip = (currentRoom.tip || 0) * myShare;
+            const total = mySubtotal + myTax + myTip;
+            
+            document.getElementById('personalTotal').textContent = '$' + total.toFixed(2);
+            
+            const list = document.getElementById('personalItems');
+            list.innerHTML = '';
+            
+            myItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between py-2 border-b border-gray-800';
+                div.innerHTML = `
+                    <span class="text-gray-400">${item.name}</span>
+                    <span>$${item.amount.toFixed(2)}</span>
+                `;
+                list.appendChild(div);
+            });
+            
+            if (myTax || myTip) {
+                const div = document.createElement('div');
+                div.className = 'mt-4 pt-4 border-t border-gray-700';
+                div.innerHTML = `
+                    ${myTax ? `<div class="flex justify-between mb-2"><span class="text-gray-400">Tax (${(myShare*100).toFixed(0)}%)</span><span>$${myTax.toFixed(2)}</span></div>` : ''}
+                    ${myTip ? `<div class="flex justify-between"><span class="text-gray-400">Tip (${(myShare*100).toFixed(0)}%)</span><span>$${myTip.toFixed(2)}</span></div>` : ''}
+                `;
+                list.appendChild(div);
+            }
+        }
+
+        function showGroupSummary() {
+            showScreen('summary');
+            updateGroupSummary();
+        }
+
+        function updateGroupSummary() {
+            const subtotal = currentRoom.items.reduce((sum, i) => sum + i.price, 0);
+            const totals = [];
+            
+            currentRoom.participants.forEach(p => {
+                let pSubtotal = 0;
+                currentRoom.items.forEach(item => {
+                    const claim = item.claimants.find(c => c.userId === p.id);
+                    if (claim) {
+                        if (claim.type === 'solo') pSubtotal += item.price;
+                        else if (claim.type === 'even') pSubtotal += item.price / item.claimants.length;
+                        else if (claim.type === 'unit') pSubtotal += (claim.units / item.quantity) * item.price;
+                    }
+                });
+                
+                const share = subtotal > 0 ? pSubtotal / subtotal : 0;
+                const tax = (currentRoom.tax || 0) * share;
+                const tip = (currentRoom.tip || 0) * share;
+                
+                totals.push({
+                    user: p,
+                    subtotal: pSubtotal,
+                    tax,
+                    tip,
+                    total: pSubtotal + tax + tip
+                });
+            });
+            
+            totals.sort((a, b) => b.total - a.total);
+            
+            const list = document.getElementById('groupSummary');
+            list.innerHTML = '';
+            
+            totals.forEach((t, i) => {
+                const div = document.createElement('div');
+                div.className = 'card mb-3';
+                const isMe = t.user.id === currentUser.id;
+                div.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="text-2xl font-black text-primary">#${i + 1}</div>
+                        <div class="avatar">${t.user.emoji}</div>
+                        <div class="flex-1">
+                            <p class="font-bold">${t.user.name}${isMe ? ' (You)' : ''}</p>
+                            <p class="text-xs text-gray-400">Food: $${t.subtotal.toFixed(2)} + Tax/Tip</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-black text-green-400">$${t.total.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    ${isMe ? `
+                        <div class="flex gap-2 mt-4">
+                            <a href="venmo://paycharge?txn=pay&amount=${t.total.toFixed(2)}&note=SPLITT-${currentRoom.code}" class="btn btn-primary flex-1 text-sm">Venmo</a>
+                            <a href="https://cash.app/$/${t.total.toFixed(2)}" class="btn btn-success flex-1 text-sm">Cash App</a>
+                        </div>
+                    ` : ''}
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // Persistence
+        function saveRoom() {
+            if (currentRoom && currentRoom.code) {
+                localStorage.setItem('splitt_room_' + currentRoom.code, JSON.stringify(currentRoom));
+                localStorage.setItem('splitt_current', JSON.stringify({ roomCode: currentRoom.code, userId: currentUser?.id }));
+            }
+        }
+
+        function loadSavedSession() {
+            const saved = localStorage.getItem('splitt_current');
+            if (saved) {
+                const { roomCode, userId } = JSON.parse(saved);
+                const roomData = localStorage.getItem('splitt_room_' + roomCode);
+                if (roomData) {
+                    currentRoom = JSON.parse(roomData);
+                    currentRoom.code = roomCode;
+                    currentUser = currentRoom.participants.find(p => p.id === userId);
+                    if (currentUser) {
+                        // Restore to appropriate screen
+                        if (currentRoom.status === 'lobby') {
+                            showScreen('lobby');
+                            updateLobby();
+                            startSync();
+                        } else if (currentRoom.status === 'receipt') {
+                            showScreen('receipt');
+                        } else if (currentRoom.status === 'draft') {
+                            showScreen('draft');
+                            updateDraft();
+                            startSync();
+                        }
+                    }
+                }
+            }
+        }
+
+        function startSync() {
+            setInterval(() => {
+                if (currentRoom?.code) {
+                    const saved = localStorage.getItem('splitt_room_' + currentRoom.code);
+                    if (saved) {
+                        const updated = JSON.parse(saved);
+                        // Merge updates
+                        currentRoom.participants = updated.participants;
+                        currentRoom.items = updated.items;
+                        currentRoom.status = updated.status;
+                        
+                        // Update UI based on current screen
+                        if (document.getElementById('lobbyScreen').classList.contains('active')) {
+                            updateLobby();
+                        } else if (document.getElementById('draftScreen').classList.contains('active')) {
+                            updateDraft();
+                        }
+                    }
+                }
+            }, 1000);
+        }
+
+        function resetApp() {
+            localStorage.removeItem('splitt_current');
+            currentRoom = null;
+            currentUser = null;
+            showScreen('welcome');
+        }
+    </script>
+</body>
+</html>
