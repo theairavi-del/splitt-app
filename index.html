@@ -67,7 +67,9 @@
             <h1 class="text-4xl font-black mb-3">Split bills<br><span style="color: var(--primary);">in seconds</span></h1>
             <p class="text-lg mb-8" style="color: var(--text-secondary);">No accounts. No downloads.<br>Just scan, claim, and pay.</p>
             <div class="w-full max-w-sm space-y-4">
-                <button class="btn btn-primary w-full text-xl" onclick="createRoom()">🆕 New Split</button>\n                <button class="btn btn-outline w-full" onclick="showJoin()">🔗 Join Split</button>\n            </div>
+                <button class="btn btn-primary w-full text-xl" onclick="createRoom()">🆕 New Split</button>
+                <button class="btn btn-outline w-full" onclick="showJoin()">🔗 Join Split</button>
+            </div>
         </div>
     </div>
 
@@ -155,7 +157,14 @@
             
             <!-- Paste Tab -->
             <div id="pasteSection" class="hidden flex-1 flex flex-col">
-                <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...\n\nExample:\n2x Chicken Wings $24.00\nCaesar Salad $12.50\nTax $3.65\nTip $8.00\nTotal $48.15"></textarea>
+                <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...
+
+Example:
+2x Chicken Wings $24.00
+Caesar Salad $12.50
+Tax $3.65
+Tip $8.00
+Total $48.15"></textarea>
             </div>
             
             <!-- Manual Tab -->
@@ -190,7 +199,8 @@
             <div class="flex-1 overflow-y-auto space-y-3 pb-4" id="itemsList"></div>
             <div class="pt-4 pb-6">
                 <div class="flex justify-between items-center mb-3">
-                    <span style="color: var(--text-secondary);">Your Total:</span>\n                    <span class="text-2xl font-black" style="color: var(--success);" id="runningTotal">$0.00</span>
+                    <span style="color: var(--text-secondary);">Your Total:</span>
+                    <span class="text-2xl font-black" style="color: var(--success);" id="runningTotal">$0.00</span>
                 </div>
                 <button class="btn btn-success w-full" onclick="reviewSplit()">Review Split →</button>
             </div>
