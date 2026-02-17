@@ -273,38 +273,109 @@ Total $48.15"></textarea>
               tax: /^(?:tax|vat|gst|hst|sales\s*tax)(?:\s*\(?\d*[%\s)]*)?[:\s]*[$€£]?(\d[0-9,\.]+)/i,
               tip: /^(?:tip|gratuity|service\s*charge)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
               total: /^(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
-              skip: /^(?:receipt|invoice|order|ticket|cashier|server|table|guest|thank|call|visit|www\.|http|tel|phone|fax|email)/i
+              // Skip patterns for non-item lines
+              skip: /^(?:receipt|invoice|order|ticket|cashier|server|table|guest|thank|call|visit|www\.|http|tel|phone|fax|email|date|time)/i,
+              zipCode: /^\d{5}(-\d{4})?$/,  // ZIP codes
+              phoneNumber: /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,  // Phone numbers
+              address: /^(?:\d+\s+(?:st|ave|rd|dr|blvd|ln|ct|way|pl|trl|hwy)|p\.?o\.?\s*box)/i,  // Addresses
+              pureNumber: /^\d+\.?\d*$/,  // Just a number with no text
+              shortLine: /^.{1,2}$/,  // Very short lines (initials, etc)
             };
+            
+            // Words that indicate this is NOT a food item
+            this.nonItemWords = [
+              'zip', 'postal', 'code', 'tel', 'phone', 'fax', 'email', 'www', 'http',
+              'date', 'time', 'server', 'cashier', 'check', 'ticket', 'order',
+              'payment', 'card', 'credit', 'debit', 'cash', 'change', 'balance',
+              'subtotal', 'total', 'tax', 'tip', 'gratuity', 'discount', 'promo',
+              'address', 'street', 'ave', 'st', 'rd', 'blvd', 'suite', 'unit',
+              'guests', 'party', 'table', 'seat', 'cover'
+            ];
+          }
+
+          isLikelyItem(name, price, line) {
+            // Must have actual text, not just numbers/symbols
+            if (!name || name.length < 2) return false;
+            
+            // Must contain at least one letter
+            if (!/[a-zA-Z]/.test(name)) return false;
+            
+            // Check for non-item words
+            const nameLower = name.toLowerCase();
+            for (const word of this.nonItemWords) {
+              if (nameLower.includes(word)) return false;
+            }
+            
+            // Price should be reasonable for a food item (between $0.50 and $500)
+            if (price < 0.5 || price > 500) return false;
+            
+            // Shouldn't look like a date
+            if (/\d{1,2}[\/\-\.]\d{1,2}/.test(name)) return false;
+            
+            // Shouldn't look like a time
+            if (/\d{1,2}:\d{2}/.test(name)) return false;
+            
+            return true;
           }
 
           parseReceiptText(text) {
             if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
-            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-            const itemLines = lines.filter(line => !this.patterns.skip.test(line));
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 2);
             
             let items = [];
             let tax = 0, tip = 0, total = 0;
+            let foundTotal = false;
 
-            for (const line of itemLines) {
+            for (const line of lines) {
+                // Skip obviously non-item lines
+                if (this.patterns.skip.test(line)) continue;
+                if (this.patterns.zipCode.test(line)) continue;
+                if (this.patterns.phoneNumber.test(line)) continue;
+                if (this.patterns.address.test(line)) continue;
+                if (this.patterns.pureNumber.test(line)) continue;
+                
+                // Check for tax/tip/total first
                 const taxMatch = line.match(this.patterns.tax);
-                if (taxMatch) { tax = parseFloat(taxMatch[1]); continue; }
+                if (taxMatch) { 
+                  const t = parseFloat(taxMatch[1].replace(',', ''));
+                  if (!isNaN(t)) tax = t;
+                  continue; 
+                }
                 
                 const tipMatch = line.match(this.patterns.tip);
-                if (tipMatch) { tip = parseFloat(tipMatch[1]); continue; }
+                if (tipMatch) { 
+                  const t = parseFloat(tipMatch[1].replace(',', ''));
+                  if (!isNaN(t)) tip = t;
+                  continue; 
+                }
                 
                 const totalMatch = line.match(this.patterns.total);
-                if (totalMatch) { total = parseFloat(totalMatch[1]); continue; }
+                if (totalMatch) { 
+                  const t = parseFloat(totalMatch[1].replace(',', ''));
+                  if (!isNaN(t)) total = t;
+                  foundTotal = true;
+                  continue; 
+                }
 
+                // Skip lines after we've seen the total (usually payment info)
+                if (foundTotal) continue;
+
+                // Try to match item pattern
                 const itemMatch = line.match(this.patterns.itemLine);
                 if (itemMatch) {
                     const qty = parseInt(itemMatch[1] || "1");
                     const name = itemMatch[2].trim();
-                    const price = parseFloat(itemMatch[3]);
-                    if (name.length > 1 && !isNaN(price)) {
+                    const price = parseFloat(itemMatch[3].replace(',', ''));
+                    
+                    if (this.isLikelyItem(name, price, line)) {
                         items.push({ name, price, quantity: qty });
                     }
                 }
             }
+            
+            // Sort items by price (descending) - usually main items first
+            items.sort((a, b) => b.price - a.price);
+            
             return { items, tax, tip, total };
           }
         }
