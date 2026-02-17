@@ -99,6 +99,7 @@
     <!-- Screen 3: Name/Avatar -->
     <div class="modal" id="nameModal">
         <div class="modal-content">
+            <button onclick="backToWelcome()" class="text-sm mb-4" style="color: var(--text-secondary); background: none; border: none; cursor: pointer;">← Back</button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
             <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
             <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
@@ -473,6 +474,17 @@ Total $48.15"></textarea>
         }
 
         function showNameModal() { document.getElementById('nameModal').classList.add('active'); }
+        
+        function backToWelcome() {
+            // Reset state
+            state.roomCode = null;
+            state.isHost = false;
+            state.userId = null;
+            document.getElementById('nameModal').classList.remove('active');
+            document.getElementById('userName').value = '';
+            showScreen('welcome');
+        }
+        
         function initEmojiGrid() {
             const grid = document.getElementById('emojiGrid');
             EMOJIS.forEach((e, i) => {
