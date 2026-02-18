@@ -152,7 +152,8 @@
             
             <!-- Camera Tab -->
             <div id="cameraSection" class="flex-1 flex flex-col">
-                <input type="file" id="receiptImage" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                <input type="file" id="receiptImage" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+                <input type="file" id="galleryImage" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
                 <div id="cameraPreview" class="hidden flex-1 flex flex-col">
                     <img id="previewImg" class="w-full max-h-64 object-contain rounded-xl mb-4 bg-black">
                     <div id="scanningOverlay" class="hidden relative">
@@ -663,15 +664,11 @@ Total $48.15"></textarea>
         let extractedItemsFromImage = [];
 
         function triggerCamera() {
-            const input = document.getElementById('receiptImage');
-            input.setAttribute('capture', 'environment');
-            input.click();
+            document.getElementById('receiptImage').click();
         }
 
         function triggerGallery() {
-            const input = document.getElementById('receiptImage');
-            input.removeAttribute('capture');
-            input.click();
+            document.getElementById('galleryImage').click();
         }
 
         function handleImageUpload(event) {
@@ -809,15 +806,6 @@ Total $48.15"></textarea>
                 `;
                 container.appendChild(div);
             });
-            
-            // Update preview box
-            const previewBox = document.getElementById('previewBox');
-            previewBox.innerHTML = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip).map(item => `
-                <div class="flex justify-between py-2 border-b" style="border-color: var(--border);">
-                    <span>${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</span>
-                    <span>$${item.price.toFixed(2)}</span>
-                </div>
-            `).join('');
             
             // Set the session items
             const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
