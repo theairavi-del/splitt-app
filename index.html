@@ -164,6 +164,18 @@
                 <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
                     <div class="text-sm mb-2" style="color: var(--text-secondary);">Extracted Items:</div>
                     <div id="extractedItems" class="space-y-2"></div>
+                    
+                    <!-- Receipt Summary -->
+                    <div id="receiptSummary" class="hidden card mt-4" style="border-color: var(--success);">
+                        <div class="text-sm font-bold mb-2" style="color: var(--success);">✓ Scanned Summary</div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal:</span><span id="scannedSubtotal">$0.00</span></div>
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax:</span><span id="scannedTax">$0.00</span></div>
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Tip:</span><span id="scannedTip">$0.00</span></div>
+                            <div class="border-t pt-2 mt-2 flex justify-between font-bold" style="border-color: var(--border);"><span>Total:</span><span id="scannedTotal" style="color: var(--success);">$0.00</span></div>
+                        </div>
+                        <div class="mt-3 text-xs text-center" style="color: var(--text-secondary);">👆 Double-check items above before continuing</div>
+                    </div>
                 </div>
             </div>
             
@@ -189,7 +201,7 @@ Total $48.15"></textarea>
             <div class="card mb-4 max-h-48 overflow-y-auto" id="previewBox">
                 <div class="text-center py-8" style="color: var(--text-secondary);">Receipt preview will appear here</div>
             </div>
-            <button class="btn btn-success w-full mb-6" onclick="processReceipt()">Continue</button>
+            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">📷 Upload a receipt first</button>
         </div>
     </div>
 
@@ -539,6 +551,31 @@ Total $48.15"></textarea>
             document.getElementById('tab-camera').style.background = t === 'camera' ? 'var(--primary)' : 'transparent';
             document.getElementById('tab-paste').style.background = t === 'paste' ? 'var(--primary)' : 'transparent';
             document.getElementById('tab-manual').style.background = t === 'manual' ? 'var(--primary)' : 'transparent';
+            
+            // Update continue button based on tab and state
+            const continueBtn = document.getElementById('continueBtn');
+            if (t === 'paste') {
+                // Enable for paste tab (user can type manually)
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = 'Continue';
+            } else if (t === 'manual') {
+                // Enable for manual tab
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = 'Continue';
+            } else if (t === 'camera') {
+                // For camera tab, check if we have scanned items
+                if (extractedItemsFromImage.length === 0) {
+                    continueBtn.disabled = true;
+                    continueBtn.style.opacity = '0.5';
+                    continueBtn.textContent = '📷 Upload a receipt first';
+                } else {
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = '✓ Continue';
+                }
+            }
         }
 
         let extractedItemsFromImage = [];
@@ -577,6 +614,12 @@ Total $48.15"></textarea>
         async function simulateOCR() {
             const img = document.getElementById('previewImg');
             const scanningOverlay = document.getElementById('scanningOverlay');
+            const continueBtn = document.getElementById('continueBtn');
+            
+            // Disable continue button while scanning
+            continueBtn.disabled = true;
+            continueBtn.style.opacity = '0.5';
+            continueBtn.textContent = '🔍 Scanning...';
             
             try {
                 scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">📖 Reading receipt...</div>';
@@ -617,6 +660,10 @@ Total $48.15"></textarea>
                     setTab('paste');
                     alert('Could not parse receipt automatically. Please review the text and edit as needed.');
                     scanningOverlay.classList.add('hidden');
+                    // Enable continue button for manual mode
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = 'Continue';
                     return;
                 }
                 
@@ -624,14 +671,38 @@ Total $48.15"></textarea>
                 document.getElementById('cameraResults').classList.remove('hidden');
                 renderExtractedItems();
                 
+                // Show summary
+                showReceiptSummary(parsed);
+                
+                // Enable continue button after successful scan
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = '✓ Continue';
+                
             } catch (error) {
                 console.error('OCR Error:', error);
                 scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">❌ Error reading receipt</div>';
+                continueBtn.textContent = '❌ Error - Try Paste Instead';
                 setTimeout(() => {
                     scanningOverlay.classList.add('hidden');
                     setTab('paste');
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = 'Continue';
                 }, 2000);
             }
+        }
+        
+        function showReceiptSummary(parsed) {
+            const foodItems = parsed.items;
+            const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const total = subtotal + parsed.tax + parsed.tip;
+            
+            document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('scannedTax').textContent = '$' + parsed.tax.toFixed(2);
+            document.getElementById('scannedTip').textContent = '$' + parsed.tip.toFixed(2);
+            document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('receiptSummary').classList.remove('hidden');
         }
 
         function renderExtractedItems() {
@@ -677,6 +748,29 @@ Total $48.15"></textarea>
         function removeExtractedItem(index) {
             extractedItemsFromImage.splice(index, 1);
             renderExtractedItems();
+            
+            // Update continue button and summary if no items left
+            const continueBtn = document.getElementById('continueBtn');
+            if (extractedItemsFromImage.length === 0) {
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                continueBtn.textContent = '📷 Upload a receipt first';
+                document.getElementById('receiptSummary').classList.add('hidden');
+            } else {
+                // Recalculate and show updated summary
+                const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+                const taxItem = extractedItemsFromImage.find(i => i.isTax);
+                const tipItem = extractedItemsFromImage.find(i => i.isTip);
+                const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const tax = taxItem ? taxItem.price : 0;
+                const tip = tipItem ? tipItem.price : 0;
+                const total = subtotal + tax + tip;
+                
+                document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+                document.getElementById('scannedTax').textContent = '$' + tax.toFixed(2);
+                document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
+                document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            }
         }
 
         function processReceipt() {
