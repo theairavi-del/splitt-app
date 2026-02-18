@@ -135,6 +135,7 @@
             </div>
             <div class="space-y-3">
                 <button class="btn btn-success w-full" id="startBtn" onclick="goToReceipt()" style="display: none;">Start Splitting</button>
+                <button class="btn btn-outline w-full" onclick="shareRoom()">Share Link</button>
                 <button class="btn btn-outline w-full" onclick="leaveRoom()">Leave Room</button>
             </div>
         </div>
@@ -494,9 +495,33 @@ Total $48.15"></textarea>
         };
 
         window.onload = () => {
-            loadSession();
-            initEmojiGrid();
-            startSync();
+            // Check for room code in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            
+            if (roomFromUrl && roomFromUrl.length === 6) {
+                // Auto-join from shared link
+                const code = roomFromUrl.toUpperCase();
+                // Create stub room if doesn't exist
+                if (!localStorage.getItem('room_' + code)) {
+                    localStorage.setItem('room_' + code, JSON.stringify({
+                        items: [],
+                        participants: [],
+                        status: 'lobby',
+                        lastModified: Date.now()
+                    }));
+                }
+                state.roomCode = code;
+                state.isHost = false;
+                state.userId = generateId();
+                initEmojiGrid();
+                showNameModal();
+                startSync();
+            } else {
+                loadSession();
+                initEmojiGrid();
+                startSync();
+            }
         };
 
         function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
@@ -557,10 +582,32 @@ Total $48.15"></textarea>
         function joinRoom() {
             const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
             if (code.length < 6) return;
-            if (!localStorage.getItem('room_' + code)) return alert('Room not found!');
+            
+            // Check if room exists locally
+            let roomData = localStorage.getItem('room_' + code);
+            
+            if (!roomData) {
+                // Room doesn't exist locally - create a stub for cross-device sync
+                // This allows joining from a different device via share link
+                const stubSession = {
+                    items: [],
+                    participants: [],
+                    status: 'lobby',
+                    lastModified: Date.now()
+                };
+                localStorage.setItem('room_' + code, JSON.stringify(stubSession));
+                roomData = JSON.stringify(stubSession);
+            }
+            
             state.roomCode = code;
             state.isHost = false;
             state.userId = generateId();
+            
+            // Clear URL params if present
+            if (window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
             hideJoin();
             showNameModal();
         }
@@ -609,6 +656,20 @@ Total $48.15"></textarea>
             document.getElementById('lobbyCode').textContent = state.roomCode;
             document.getElementById('startBtn').style.display = state.isHost ? 'block' : 'none';
             renderPlayers();
+        }
+
+        function shareRoom() {
+            const shareUrl = window.location.origin + window.location.pathname + '?room=' + state.roomCode;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Join my SPLITT room',
+                    text: 'Room code: ' + state.roomCode,
+                    url: shareUrl
+                });
+            } else {
+                navigator.clipboard.writeText(shareUrl);
+                alert('Link copied! Send this to your friends:\n' + shareUrl);
+            }
         }
 
         function renderPlayers() {
