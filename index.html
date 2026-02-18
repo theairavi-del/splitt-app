@@ -61,14 +61,14 @@
 <body>
     <!-- Navigation -->
     <nav class="nav" id="nav" style="display: none;">
-        <div class="text-2xl font-black" style="color: var(--primary);">SPLITT</div>
+        <div class="text-2xl font-black cursor-pointer" style="color: var(--primary);" onclick="goHome()" title="Go to welcome screen">SPLITT</div>
         <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
     </nav>
 
     <!-- Screen 1: Welcome -->
     <div class="screen active" id="welcomeScreen">
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div class="text-8xl mb-6 emoji-bounce">💸</div>
+            <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
             <h1 class="text-4xl font-black mb-3">Split bills<br><span style="color: var(--primary);">in seconds</span></h1>
             <p class="text-lg mb-8" style="color: var(--text-secondary);">No accounts. No downloads.<br>Just scan, claim, and pay.</p>
             <div class="w-full max-w-sm space-y-4">
@@ -100,7 +100,7 @@
     <!-- Screen 3: Name/Avatar -->
     <div class="modal" id="nameModal">
         <div class="modal-content">
-            <button onclick="backToWelcome()" class="text-sm mb-4" style="color: var(--text-secondary); background: none; border: none; cursor: pointer;">← Back</button>
+            <button onclick="backToWelcome()" class="text-sm mb-4" style="color: var(--text-secondary); background: none; border: none; cursor: pointer;">[Back] Back</button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
             <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
             <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
@@ -159,7 +159,7 @@
         <div class="pt-20 px-6 flex-1 flex flex-col">
             <h2 class="text-2xl font-bold mb-4">Add Receipt</h2>
             <div class="flex gap-2 mb-4">
-                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">📷 Camera</button>
+                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">[Cam] Camera</button>
                 <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px;">Paste</button>
                 <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('manual')" id="tab-manual" style="min-height: 44px;">Manual</button>
             </div>
@@ -172,22 +172,22 @@
                     <img id="previewImg" class="w-full max-h-64 object-contain rounded-xl mb-4 bg-black">
                     <div id="scanningOverlay" class="hidden relative">
                         <div class="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/20 to-transparent h-8 animate-pulse"></div>
-                        <div class="text-center text-green-400 font-bold">🔍 Scanning receipt...</div>
+                        <div class="text-center text-green-400 font-bold">[Scan] Scanning receipt...</div>
                     </div>
                 </div>
                 <div id="cameraButtons" class="flex-1 flex flex-col justify-center gap-4">
                     <div id="ocrLoading" class="hidden text-center mb-4">
-                        <div class="text-yellow-400 font-bold mb-2">📦 Loading OCR engine...</div>
+                        <div class="text-yellow-400 font-bold mb-2">[Box] Loading OCR engine...</div>
                         <div class="text-sm" style="color: var(--text-secondary);">First time only (2-3MB)</div>
                     </div>
                     <button class="btn btn-primary w-full" onclick="triggerCamera()">
-                        📷 Take Photo
+                        [Cam] Take Photo
                     </button>
                     <button class="btn btn-outline w-full" onclick="triggerGallery()">
-                        🖼️ Choose from Gallery
+                        [Img] Choose from Gallery
                     </button>
                     <div class="text-center text-xs mt-4" style="color: var(--text-secondary);">
-                        💡 Tip: Make sure receipt is well-lit and flat
+                        [Tip] Tip: Make sure receipt is well-lit and flat
                     </div>
                 </div>
                 <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
@@ -196,12 +196,12 @@
                     
                     <!-- Add Missing Item Button -->
                     <button class="btn btn-outline w-full mt-3 mb-2" onclick="showAddItemModal()" style="min-height: 44px; font-size: 14px;">
-                        ➕ Add Missing Item
+                        [+] Add Missing Item
                     </button>
                     
                     <!-- Receipt Summary -->
                     <div id="receiptSummary" class="hidden card mt-4" style="border-color: var(--success);">
-                        <div class="text-sm font-bold mb-2" style="color: var(--success);">✓ Scanned Summary</div>
+                        <div class="text-sm font-bold mb-2" style="color: var(--success);">[OK] Scanned Summary</div>
                         <div class="space-y-1 text-sm">
                             <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal:</span><span id="scannedSubtotal">$0.00</span></div>
                             <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax:</span><span id="scannedTax">$0.00</span></div>
@@ -232,7 +232,7 @@ Total $48.15"></textarea>
                 <button class="btn btn-outline w-full mb-4" onclick="addManualItem()">Add Item</button>
             </div>
             
-            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">📷 Upload a receipt first</button>
+            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">[Cam] Upload a receipt first</button>
         </div>
     </div>
 
@@ -247,7 +247,7 @@ Total $48.15"></textarea>
             </div>
             <div class="card orphan-glow mb-4 hidden" id="orphanAlert">
                 <div class="flex items-center gap-3">
-                    <span class="text-2xl">⚠️</span>
+                    <span class="text-2xl" style="color: var(--warning);">[!]</span>
                     <span><strong id="orphanCount">0</strong> items still need to be claimed!</span>
                 </div>
             </div>
@@ -287,8 +287,8 @@ Total $48.15"></textarea>
             </div>
 
             <div class="space-y-3">
-                <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good ✓</button>
-                <button class="btn btn-outline w-full" onclick="backToSelection()">← Go Back & Edit</button>
+                <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good [OK]</button>
+                <button class="btn btn-outline w-full" onclick="backToSelection()">[Back] Go Back & Edit</button>
             </div>
         </div>
     </div>
@@ -497,8 +497,55 @@ Total $48.15"></textarea>
           }
         }
 
-        const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆'];
+        const EMOJIS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
         const parser = new ReceiptParser();
+        
+        // Storage wrapper with error handling and fallback
+        const storage = {
+            _memory: {},
+            _available: null,
+            isAvailable() {
+                if (this._available !== null) return this._available;
+                try {
+                    const test = '__test__';
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    this._available = true;
+                    return true;
+                } catch (e) {
+                    this._available = false;
+                    console.warn('localStorage not available, using memory fallback');
+                    return false;
+                }
+            },
+            getItem(key) {
+                if (this.isAvailable()) {
+                    try { return localStorage.getItem(key); } catch (e) { return this._memory[key] || null; }
+                }
+                return this._memory[key] || null;
+            },
+            setItem(key, value) {
+                if (this.isAvailable()) {
+                    try { localStorage.setItem(key, value); } catch (e) { this._memory[key] = value; }
+                } else {
+                    this._memory[key] = value;
+                }
+            },
+            removeItem(key) {
+                if (this.isAvailable()) {
+                    try { localStorage.removeItem(key); } catch (e) { delete this._memory[key]; }
+                } else {
+                    delete this._memory[key];
+                }
+            },
+            clear() {
+                if (this.isAvailable()) {
+                    try { localStorage.clear(); } catch (e) { this._memory = {}; }
+                } else {
+                    this._memory = {};
+                }
+            }
+        };
         
         // Supabase config
         const SUPABASE_URL = 'https://idjjrpaixhhkpattgwbj.supabase.co';
@@ -533,53 +580,39 @@ Total $48.15"></textarea>
         };
 
         window.onload = () => {
-            // Check for room code in URL
+            // Clear any previous session on load (Bug 1 fix: reset on refresh)
+            storage.removeItem('splitt_user_state');
+            
+            // Check for room code in URL (Bug 8 fix: auto-join from shared link)
             const urlParams = new URLSearchParams(window.location.search);
             const roomFromUrl = urlParams.get('room');
             
             if (roomFromUrl && roomFromUrl.length === 6) {
-                // Auto-join from shared link - fetch room from Supabase first
+                // Auto-join from shared link - validate room exists first
                 const code = roomFromUrl.toUpperCase();
-                state.roomCode = code;
-                state.isHost = false;
-                state.userId = generateId();
                 
-                // Try to fetch existing room from Supabase
-                if (supabaseClient) {
-                    supabaseClient.from('rooms').select('*').eq('code', code).single()
-                        .then(({ data, error }) => {
-                            if (data && data.data) {
-                                // Found existing room - use it
-                                state.session = data.data;
-                                localStorage.setItem('room_' + code, JSON.stringify(data.data));
-                                console.log('Joined existing room from Supabase');
-                            } else {
-                                // Room not found in Supabase - create stub
-                                createLocalStub(code);
-                            }
-                            initEmojiGrid();
-                            showNameModal();
-                            startSync();
-                        })
-                        .catch((err) => {
-                            console.log('Supabase fetch failed:', err);
-                            createLocalStub(code);
-                            initEmojiGrid();
-                            showNameModal();
-                            startSync();
-                        });
-                } else {
-                    // No Supabase - use localStorage or create stub
-                    const localData = localStorage.getItem('room_' + code);
-                    if (localData) {
-                        state.session = JSON.parse(localData);
+                // Validate room exists before proceeding (Bug 8 fix)
+                tryFetchRoom(code).then((roomData) => {
+                    if (roomData) {
+                        // Room exists - proceed to name entry
+                        state.roomCode = code;
+                        state.session = roomData;
+                        state.isHost = false;
+                        state.userId = generateId();
+                        initEmojiGrid();
+                        showNameModal();
+                        startSync();
                     } else {
-                        createLocalStub(code);
+                        // Room not found - show error and stay on welcome screen
+                        alert('Room "' + code + '" not found! The link may be expired or invalid.');
+                        // Clear the URL param
+                        if (window.history.replaceState) {
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                        initEmojiGrid();
+                        startSync();
                     }
-                    initEmojiGrid();
-                    showNameModal();
-                    startSync();
-                }
+                });
             } else {
                 loadSession();
                 initEmojiGrid();
@@ -606,27 +639,19 @@ Total $48.15"></textarea>
                 lastModified: Date.now()
             };
             state.session = stub;
-            localStorage.setItem('room_' + code, JSON.stringify(stub));
+            storage.setItem('room_' + code, JSON.stringify(stub));
         }
 
         function loadSession() {
-            const saved = localStorage.getItem('splitt_user_state');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed.roomCode) {
-                    state = parsed;
-                    const roomData = localStorage.getItem('room_' + state.roomCode);
-                    if (roomData) state.session = JSON.parse(roomData);
-                    showScreen(state.session.status === 'lobby' ? 'lobby' : (state.session.status === 'selecting' ? 'select' : 'final'));
-                    updateUI();
-                }
-            }
+            // Clear any in-progress state on page refresh (Bug 1 fix)
+            storage.removeItem('splitt_user_state');
+            // Don't auto-restore - force user to rejoin
         }
 
         function saveSession() {
             state.session.lastModified = Date.now();
-            localStorage.setItem('splitt_user_state', JSON.stringify(state));
-            localStorage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
+            storage.setItem('splitt_user_state', JSON.stringify(state));
+            storage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
             
             // Also save to Supabase for cross-device sync
             if (supabaseClient && state.roomCode) {
@@ -646,8 +671,8 @@ Total $48.15"></textarea>
             setInterval(() => {
                 if (!state.roomCode) return;
                 
-                // First check localStorage (fast)
-                const localData = localStorage.getItem('room_' + state.roomCode);
+                // First check storage (fast)
+                const localData = storage.getItem('room_' + state.roomCode);
                 if (localData) {
                     const parsed = JSON.parse(localData);
                     if (parsed.lastModified > state.session.lastModified) {
@@ -663,7 +688,7 @@ Total $48.15"></textarea>
                         .then((result) => {
                             if (result.data && result.data.data.lastModified > state.session.lastModified) {
                                 state.session = result.data.data;
-                                localStorage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
+                                storage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
                                 updateUI();
                             }
                         }).catch(() => {
@@ -673,11 +698,51 @@ Total $48.15"></textarea>
             }, 2000);
         }
 
-        function showScreen(id) {
+        // Screen history for back/forward navigation (Bug 7 fix)
+        const screenHistory = [];
+        let currentScreenId = 'welcome';
+        
+        function showScreen(id, pushHistory = true) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id + 'Screen').classList.add('active');
             document.getElementById('nav').style.display = id === 'welcome' ? 'none' : 'flex';
+            
+            // Push state for browser back/forward support
+            if (pushHistory && id !== currentScreenId) {
+                currentScreenId = id;
+                if (history.state?.screen !== id) {
+                    history.pushState({ screen: id }, '', window.location.pathname + window.location.search);
+                }
+            }
         }
+        
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', (e) => {
+            if (e.state && e.state.screen) {
+                currentScreenId = e.state.screen;
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(e.state.screen + 'Screen').classList.add('active');
+                document.getElementById('nav').style.display = e.state.screen === 'welcome' ? 'none' : 'flex';
+            } else {
+                // No state - go to welcome
+                showScreen('welcome', false);
+            }
+        });
+        
+        // Go home function for logo click (Bug 1 fix)
+        function goHome() {
+            if (confirm('Leave current split and return to welcome screen?')) {
+                leaveRoom();
+            }
+        }
+        
+        // Initialize history state
+        history.replaceState({ screen: 'welcome' }, '', window.location.pathname + window.location.search);
+        
+        // Before unload handler - clear state on page refresh (Bug 1 fix)
+        window.addEventListener('beforeunload', () => {
+            storage.removeItem('splitt_user_state');
+        });
 
         function createRoom() {
             state.roomCode = generateCode();
@@ -730,33 +795,29 @@ Total $48.15"></textarea>
             const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
             if (code.length < 6) return;
             
-            // Try Supabase first, then localStorage
+            // Validate room exists before joining (Bug 2 fix)
             tryFetchRoom(code).then((roomData) => {
                 if (roomData) {
+                    // Room exists - proceed to join
                     state.session = roomData;
+                    state.roomCode = code;
+                    state.isHost = false;
+                    state.userId = generateId();
+                    
+                    // Clear URL params if present
+                    if (window.history.replaceState) {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    
+                    hideJoin();
+                    showNameModal();
                 } else {
-                    // Create stub if room doesn't exist
-                    const stubSession = {
-                        items: [],
-                        participants: [],
-                        status: 'lobby',
-                        lastModified: Date.now()
-                    };
-                    state.session = stubSession;
-                    localStorage.setItem('room_' + code, JSON.stringify(stubSession));
+                    // Room not found - show error (Bug 2 fix)
+                    alert('Room not found! Please check the code and try again.');
+                    // Clear the PIN inputs
+                    [1,2,3,4,5,6].forEach(i => document.getElementById('p'+i).value = '');
+                    document.getElementById('p1').focus();
                 }
-                
-                state.roomCode = code;
-                state.isHost = false;
-                state.userId = generateId();
-                
-                // Clear URL params if present
-                if (window.history.replaceState) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-                
-                hideJoin();
-                showNameModal();
             });
         }
         
@@ -767,22 +828,22 @@ Total $48.15"></textarea>
                     supabaseClient.from('rooms').select('*').eq('code', code).single()
                         .then((result) => {
                             if (result.data) {
-                                localStorage.setItem('room_' + code, JSON.stringify(result.data.data));
+                                storage.setItem('room_' + code, JSON.stringify(result.data.data));
                                 resolve(result.data.data);
                             } else {
-                                // Not in Supabase, try localStorage
-                                const localData = localStorage.getItem('room_' + code);
+                                // Not in Supabase, try storage
+                                const localData = storage.getItem('room_' + code);
                                 resolve(localData ? JSON.parse(localData) : null);
                             }
                         })
                         .catch(() => {
-                            // Supabase error, try localStorage
-                            const localData = localStorage.getItem('room_' + code);
+                            // Supabase error, try storage
+                            const localData = storage.getItem('room_' + code);
                             resolve(localData ? JSON.parse(localData) : null);
                         });
                 } else {
-                    // No Supabase, just check localStorage
-                    const localData = localStorage.getItem('room_' + code);
+                    // No Supabase, just check storage
+                    const localData = storage.getItem('room_' + code);
                     resolve(localData ? JSON.parse(localData) : null);
                 }
             });
@@ -810,7 +871,7 @@ Total $48.15"></textarea>
             state.roomCode = null;
             state.isHost = false;
             state.userId = null;
-            localStorage.removeItem('splitt_user_state');
+            storage.removeItem('splitt_user_state');
             showScreen('welcome');
         }
         
@@ -931,11 +992,11 @@ Total $48.15"></textarea>
                 if (extractedItemsFromImage.length === 0) {
                     continueBtn.disabled = true;
                     continueBtn.style.opacity = '0.5';
-                    continueBtn.textContent = '📷 Upload a receipt first';
+                    continueBtn.textContent = '[Cam] Upload a receipt first';
                 } else {
                     continueBtn.disabled = false;
                     continueBtn.style.opacity = '1';
-                    continueBtn.textContent = '✓ Continue';
+                    continueBtn.textContent = '[OK] Continue';
                 }
             }
         }
@@ -980,7 +1041,7 @@ Total $48.15"></textarea>
             continueBtn.textContent = '🔍 Scanning...';
             
             try {
-                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">📖 Reading receipt...</div>';
+                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">[Read] Reading receipt...</div>';
                 
                 // Use Tesseract.js for real OCR
                 const result = await Tesseract.recognize(img.src, 'eng', {
@@ -1039,8 +1100,8 @@ Total $48.15"></textarea>
                 
             } catch (error) {
                 console.error('OCR Error:', error);
-                scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">❌ Error reading receipt</div>';
-                continueBtn.textContent = '❌ Error - Try Paste Instead';
+                scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">[Err] Error reading receipt</div>';
+                continueBtn.textContent = '[Err] Error - Try Paste Instead';
                 setTimeout(() => {
                     scanningOverlay.classList.add('hidden');
                     setTab('paste');
@@ -1080,7 +1141,7 @@ Total $48.15"></textarea>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="font-bold text-green-400">$${item.price.toFixed(2)}</span>
-                        <button class="text-red-400" onclick="removeExtractedItem(${i})">✕</button>
+                        <button class="text-red-400" onclick="removeExtractedItem(${i})">[X]</button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -1156,7 +1217,7 @@ Total $48.15"></textarea>
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.style.opacity = '1';
-            continueBtn.textContent = '✓ Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
+            continueBtn.textContent = '[OK] Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
             
             alert('Item added: ' + name + ' - $' + price.toFixed(2));
         }
@@ -1193,7 +1254,7 @@ Total $48.15"></textarea>
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.style.opacity = '1';
-            continueBtn.textContent = '✓ Continue';
+            continueBtn.textContent = '[OK] Continue';
             
             hideAddItemModal();
         }
@@ -1278,7 +1339,8 @@ Total $48.15"></textarea>
         function claim(id, type) {
             if (!state.session.selections[id]) state.session.selections[id] = [];
             if (type === 'solo') state.session.selections[id] = [];
-            state.session.selections[id].push({ userId: state.userId, type });
+            state.session.selections[id].push({ userId: state.userId, type, timestamp: Date.now() });
+            // Save user-specific selections for independent total calculation (Bug 6 fix)
             saveSession();
             renderItems();
         }
@@ -1327,17 +1389,17 @@ Total $48.15"></textarea>
                 
                 if (pm.venmo) {
                     const venmoUrl = pm.venmo.startsWith('http') ? pm.venmo : `https://venmo.com/${pm.venmo.replace('@', '')}`;
-                    buttonsHtml += `<a href="${venmoUrl}" target="_blank" class="btn btn-outline w-full" style="background: #008CFF; color: white; border: none;">💸 Pay with Venmo</a>`;
+                    buttonsHtml += `<a href="${venmoUrl}" target="_blank" class="btn btn-outline w-full" style="background: #008CFF; color: white; border: none;">[Pay] Pay with Venmo</a>`;
                 }
                 if (pm.cashapp) {
                     const cashUrl = pm.cashapp.startsWith('http') ? pm.cashapp : `https://cash.app/${pm.cashapp}`;
-                    buttonsHtml += `<a href="${cashUrl}" target="_blank" class="btn btn-outline w-full" style="background: #00D632; color: white; border: none;">💵 Pay with Cash App</a>`;
+                    buttonsHtml += `<a href="${cashUrl}" target="_blank" class="btn btn-outline w-full" style="background: #00D632; color: white; border: none;">[Pay] Pay with Cash App</a>`;
                 }
                 if (pm.paypal) {
-                    buttonsHtml += `<a href="${pm.paypal}" target="_blank" class="btn btn-outline w-full" style="background: #0070BA; color: white; border: none;">🅿️ Pay with PayPal</a>`;
+                    buttonsHtml += `<a href="${pm.paypal}" target="_blank" class="btn btn-outline w-full" style="background: #0070BA; color: white; border: none;">[Pay] Pay with PayPal</a>`;
                 }
                 if (pm.applepay) {
-                    buttonsHtml += `<button class="btn btn-outline w-full" style="background: #000; color: white; border: none;" onclick="alert('Apple Pay: ${pm.applepay}')">🍎 Pay with Apple Pay</button>`;
+                    buttonsHtml += `<button class="btn btn-outline w-full" style="background: #000; color: white; border: none;" onclick="alert('Apple Pay: ${pm.applepay}')">[Pay] Pay with Apple Pay</button>`;
                 }
                 
                 if (buttonsHtml) {
@@ -1386,7 +1448,7 @@ Total $48.15"></textarea>
             document.getElementById('splitCountDisplay').textContent = state.session.participants.length + ' people';
         }
 
-        function resetApp() { localStorage.clear(); location.reload(); }
+        function resetApp() { storage.clear(); location.reload(); }
         function updateUI() {
             // Check if we need to switch screens based on status
             const currentScreen = document.querySelector('.screen.active');
