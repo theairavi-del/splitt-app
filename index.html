@@ -777,7 +777,9 @@ Total $48.15"></textarea>
         
         function showReceiptSummary(parsed) {
             const foodItems = parsed.items;
-            const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            // Note: item.price is already the total for that line (after combining duplicates)
+            // So we just sum the prices, not multiply by quantity
+            const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
             const total = subtotal + parsed.tax + parsed.tip;
             
             document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
@@ -839,11 +841,11 @@ Total $48.15"></textarea>
                 continueBtn.textContent = '📷 Upload a receipt first';
                 document.getElementById('receiptSummary').classList.add('hidden');
             } else {
-                // Recalculate and show updated summary
+                // Recalculate and show updated summary (price is already total)
                 const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
                 const taxItem = extractedItemsFromImage.find(i => i.isTax);
                 const tipItem = extractedItemsFromImage.find(i => i.isTip);
-                const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
                 const tax = taxItem ? taxItem.price : 0;
                 const tip = tipItem ? tipItem.price : 0;
                 const total = subtotal + tax + tip;
@@ -880,11 +882,11 @@ Total $48.15"></textarea>
             extractedItemsFromImage.push({ name, price, quantity: qty });
             renderExtractedItems();
             
-            // Recalculate summary
+            // Recalculate summary (price is already total for that item)
             const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
             const taxItem = extractedItemsFromImage.find(i => i.isTax);
             const tipItem = extractedItemsFromImage.find(i => i.isTip);
-            const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
             const tax = taxItem ? taxItem.price : 0;
             const tip = tipItem ? tipItem.price : 0;
             const total = subtotal + tax + tip;
