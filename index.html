@@ -83,12 +83,12 @@
         <div class="modal-content">
             <h3 class="text-xl font-bold mb-4">Enter Room Code</h3>
             <div class="flex gap-2 justify-center mb-6">
-                <input type="text" class="pin-input" id="p1" maxlength="1" oninput="nextPin(1)">
-                <input type="text" class="pin-input" id="p2" maxlength="1" oninput="nextPin(2)">
-                <input type="text" class="pin-input" id="p3" maxlength="1" oninput="nextPin(3)">
-                <input type="text" class="pin-input" id="p4" maxlength="1" oninput="nextPin(4)">
-                <input type="text" class="pin-input" id="p5" maxlength="1" oninput="nextPin(5)">
-                <input type="text" class="pin-input" id="p6" maxlength="1" oninput="joinRoom()">
+                <input type="text" class="pin-input" id="p1" maxlength="1" onkeydown="handlePinKey(event, 1)" oninput="nextPin(1)">
+                <input type="text" class="pin-input" id="p2" maxlength="1" onkeydown="handlePinKey(event, 2)" oninput="nextPin(2)">
+                <input type="text" class="pin-input" id="p3" maxlength="1" onkeydown="handlePinKey(event, 3)" oninput="nextPin(3)">
+                <input type="text" class="pin-input" id="p4" maxlength="1" onkeydown="handlePinKey(event, 4)" oninput="nextPin(4)">
+                <input type="text" class="pin-input" id="p5" maxlength="1" onkeydown="handlePinKey(event, 5)" oninput="nextPin(5)">
+                <input type="text" class="pin-input" id="p6" maxlength="1" onkeydown="handlePinKey(event, 6)" oninput="joinRoom()">
             </div>
             <div class="flex gap-3">
                 <button class="btn btn-outline flex-1" onclick="hideJoin()">Cancel</button>
@@ -658,7 +658,43 @@ Total $48.15"></textarea>
 
         function showJoin() { document.getElementById('joinModal').classList.add('active'); document.getElementById('p1').focus(); }
         function hideJoin() { document.getElementById('joinModal').classList.remove('active'); }
-        function nextPin(n) { if (n < 6) document.getElementById('p' + (n + 1)).focus(); }
+        function handlePinKey(event, n) {
+            const input = document.getElementById('p' + n);
+            
+            // Handle backspace
+            if (event.key === 'Backspace') {
+                event.preventDefault();
+                if (input.value === '') {
+                    // If empty, move to previous input
+                    if (n > 1) {
+                        const prev = document.getElementById('p' + (n - 1));
+                        prev.focus();
+                        prev.value = '';
+                    }
+                } else {
+                    // Clear current input
+                    input.value = '';
+                }
+            }
+            // Handle left arrow
+            else if (event.key === 'ArrowLeft' && n > 1) {
+                event.preventDefault();
+                document.getElementById('p' + (n - 1)).focus();
+            }
+            // Handle right arrow
+            else if (event.key === 'ArrowRight' && n < 6) {
+                event.preventDefault();
+                document.getElementById('p' + (n + 1)).focus();
+            }
+        }
+
+        function nextPin(n) {
+            const input = document.getElementById('p' + n);
+            // Only move forward if user typed a character (not backspace/delete)
+            if (input.value.length === 1 && n < 6) {
+                document.getElementById('p' + (n + 1)).focus();
+            }
+        }
 
         function joinRoom() {
             const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
