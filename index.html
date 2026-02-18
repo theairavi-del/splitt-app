@@ -1025,6 +1025,31 @@ Total $48.15"></textarea>
             document.getElementById('newItemQty').value = '1';
         }
 
+        function addManualItem() {
+            const name = document.getElementById('manualName').value.trim();
+            const price = parseFloat(document.getElementById('manualPrice').value);
+            
+            if (!name || isNaN(price) || price <= 0) {
+                alert('Please enter a valid item name and price');
+                return;
+            }
+            
+            // Add to extracted items
+            extractedItemsFromImage.push({ name, price, quantity: 1 });
+            
+            // Clear inputs
+            document.getElementById('manualName').value = '';
+            document.getElementById('manualPrice').value = '';
+            
+            // Enable continue button since we have items
+            const continueBtn = document.getElementById('continueBtn');
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            continueBtn.textContent = '✓ Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
+            
+            alert('Item added: ' + name + ' - $' + price.toFixed(2));
+        }
+
         function addMissingItem() {
             const name = document.getElementById('newItemName').value.trim();
             const price = parseFloat(document.getElementById('newItemPrice').value);
@@ -1217,51 +1242,6 @@ Total $48.15"></textarea>
 
         function resetApp() { localStorage.clear(); location.reload(); }
         function updateUI() { if (state.session.status === 'lobby') renderPlayers(); else if (state.session.status === 'selecting') renderItems(); }
-        
-        // SUPABASE SETUP
-        var SUPABASE_URL = 'https://idjjrpaixhhkpattgwbj.supabase.co';
-        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkampycGFpeGhoa3BhdHRnd2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzODEzNjcsImV4cCI6MjA4Njk1NzM2N30.VobYBbh2A8pLzaX9f2YaOYQ0ee5a1c6yI4NophzYHOY';
-        var supabaseClient = null;
-        
-        if (typeof supabase !== 'undefined') {
-            try {
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                console.log('Supabase ready');
-            } catch(e) {
-                console.log('Supabase failed');
-            }
-        }
-        
-        // Override saveSession to also save to Supabase
-        var originalSaveSession = saveSession;
-        saveSession = function() {
-            originalSaveSession();
-            if (supabaseClient && state.roomCode) {
-                supabaseClient.from('rooms').upsert({
-                    code: state.roomCode,
-                    data: state.session,
-                    created_at: new Date().toISOString()
-                }).then(function() {}).catch(function() {});
-            }
-        };
-        
-        // Add Supabase sync to startSync
-        var originalStartSync = startSync;
-        startSync = function() {
-            originalStartSync();
-            if (supabaseClient && state.roomCode) {
-                setInterval(function() {
-                    supabaseClient.from('rooms').select('*').eq('code', state.roomCode).single()
-                        .then(function(result) {
-                            if (result.data && result.data.data.lastModified > state.session.lastModified) {
-                                state.session = result.data.data;
-                                localStorage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
-                                updateUI();
-                            }
-                        }).catch(function() {});
-                }, 3000);
-            }
-        };
     </script>
 </body>
 </html>
