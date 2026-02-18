@@ -478,6 +478,21 @@ Total $48.15"></textarea>
         const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆'];
         const parser = new ReceiptParser();
         
+        // Supabase config
+        const SUPABASE_URL = 'https://idjjrpaixhhkpattgwbj.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkampycGFpeGhoa3BhdHRnd2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzODEzNjcsImV4cCI6MjA4Njk1NzM2N30.VobYBbh2A8pLzaX9f2YaOYQ0ee5a1c6yI4NophzYHOY';
+        let supabaseClient = null;
+        
+        // Initialize Supabase if available
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('Supabase initialized');
+            } catch(e) {
+                console.log('Supabase init failed:', e);
+            }
+        }
+        
         let state = {
             roomCode: null,
             userId: null,
@@ -501,23 +516,48 @@ Total $48.15"></textarea>
             const roomFromUrl = urlParams.get('room');
             
             if (roomFromUrl && roomFromUrl.length === 6) {
-                // Auto-join from shared link
+                // Auto-join from shared link - fetch room from Supabase first
                 const code = roomFromUrl.toUpperCase();
-                // Create stub room if doesn't exist
-                if (!localStorage.getItem('room_' + code)) {
-                    localStorage.setItem('room_' + code, JSON.stringify({
-                        items: [],
-                        participants: [],
-                        status: 'lobby',
-                        lastModified: Date.now()
-                    }));
-                }
                 state.roomCode = code;
                 state.isHost = false;
                 state.userId = generateId();
-                initEmojiGrid();
-                showNameModal();
-                startSync();
+                
+                // Try to fetch existing room from Supabase
+                if (supabaseClient) {
+                    supabaseClient.from('rooms').select('*').eq('code', code).single()
+                        .then(({ data, error }) => {
+                            if (data && data.data) {
+                                // Found existing room - use it
+                                state.session = data.data;
+                                localStorage.setItem('room_' + code, JSON.stringify(data.data));
+                                console.log('Joined existing room from Supabase');
+                            } else {
+                                // Room not found in Supabase - create stub
+                                createLocalStub(code);
+                            }
+                            initEmojiGrid();
+                            showNameModal();
+                            startSync();
+                        })
+                        .catch((err) => {
+                            console.log('Supabase fetch failed:', err);
+                            createLocalStub(code);
+                            initEmojiGrid();
+                            showNameModal();
+                            startSync();
+                        });
+                } else {
+                    // No Supabase - use localStorage or create stub
+                    const localData = localStorage.getItem('room_' + code);
+                    if (localData) {
+                        state.session = JSON.parse(localData);
+                    } else {
+                        createLocalStub(code);
+                    }
+                    initEmojiGrid();
+                    showNameModal();
+                    startSync();
+                }
             } else {
                 loadSession();
                 initEmojiGrid();
@@ -527,6 +567,17 @@ Total $48.15"></textarea>
 
         function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
         function generateCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+        
+        function createLocalStub(code) {
+            const stub = {
+                items: [],
+                participants: [],
+                status: 'lobby',
+                lastModified: Date.now()
+            };
+            state.session = stub;
+            localStorage.setItem('room_' + code, JSON.stringify(stub));
+        }
 
         function loadSession() {
             const saved = localStorage.getItem('splitt_user_state');
@@ -546,21 +597,50 @@ Total $48.15"></textarea>
             state.session.lastModified = Date.now();
             localStorage.setItem('splitt_user_state', JSON.stringify(state));
             localStorage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
+            
+            // Also save to Supabase for cross-device sync
+            if (supabaseClient && state.roomCode) {
+                supabaseClient.from('rooms').upsert({
+                    code: state.roomCode,
+                    data: state.session,
+                    created_at: new Date().toISOString()
+                }).then(() => {
+                    console.log('Saved to Supabase');
+                }).catch((err) => {
+                    console.log('Supabase save error:', err);
+                });
+            }
         }
 
         function startSync() {
             setInterval(() => {
-                if (state.roomCode) {
-                    const data = localStorage.getItem('room_' + state.roomCode);
-                    if (data) {
-                        const parsed = JSON.parse(data);
-                        if (parsed.lastModified > state.session.lastModified) {
-                            state.session = parsed;
-                            updateUI();
-                        }
+                if (!state.roomCode) return;
+                
+                // First check localStorage (fast)
+                const localData = localStorage.getItem('room_' + state.roomCode);
+                if (localData) {
+                    const parsed = JSON.parse(localData);
+                    if (parsed.lastModified > state.session.lastModified) {
+                        state.session = parsed;
+                        updateUI();
+                        return;
                     }
                 }
-            }, 1000);
+                
+                // Then check Supabase (for cross-device)
+                if (supabaseClient) {
+                    supabaseClient.from('rooms').select('*').eq('code', state.roomCode).single()
+                        .then((result) => {
+                            if (result.data && result.data.data.lastModified > state.session.lastModified) {
+                                state.session = result.data.data;
+                                localStorage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
+                                updateUI();
+                            }
+                        }).catch(() => {
+                            // Supabase error, ignore
+                        });
+                }
+            }, 2000);
         }
 
         function showScreen(id) {
@@ -584,33 +664,62 @@ Total $48.15"></textarea>
             const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
             if (code.length < 6) return;
             
-            // Check if room exists locally
-            let roomData = localStorage.getItem('room_' + code);
-            
-            if (!roomData) {
-                // Room doesn't exist locally - create a stub for cross-device sync
-                // This allows joining from a different device via share link
-                const stubSession = {
-                    items: [],
-                    participants: [],
-                    status: 'lobby',
-                    lastModified: Date.now()
-                };
-                localStorage.setItem('room_' + code, JSON.stringify(stubSession));
-                roomData = JSON.stringify(stubSession);
-            }
-            
-            state.roomCode = code;
-            state.isHost = false;
-            state.userId = generateId();
-            
-            // Clear URL params if present
-            if (window.history.replaceState) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-            
-            hideJoin();
-            showNameModal();
+            // Try Supabase first, then localStorage
+            tryFetchRoom(code).then((roomData) => {
+                if (roomData) {
+                    state.session = roomData;
+                } else {
+                    // Create stub if room doesn't exist
+                    const stubSession = {
+                        items: [],
+                        participants: [],
+                        status: 'lobby',
+                        lastModified: Date.now()
+                    };
+                    state.session = stubSession;
+                    localStorage.setItem('room_' + code, JSON.stringify(stubSession));
+                }
+                
+                state.roomCode = code;
+                state.isHost = false;
+                state.userId = generateId();
+                
+                // Clear URL params if present
+                if (window.history.replaceState) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+                
+                hideJoin();
+                showNameModal();
+            });
+        }
+        
+        function tryFetchRoom(code) {
+            return new Promise((resolve) => {
+                // Try Supabase first
+                if (supabaseClient) {
+                    supabaseClient.from('rooms').select('*').eq('code', code).single()
+                        .then((result) => {
+                            if (result.data) {
+                                localStorage.setItem('room_' + code, JSON.stringify(result.data.data));
+                                resolve(result.data.data);
+                            } else {
+                                // Not in Supabase, try localStorage
+                                const localData = localStorage.getItem('room_' + code);
+                                resolve(localData ? JSON.parse(localData) : null);
+                            }
+                        })
+                        .catch(() => {
+                            // Supabase error, try localStorage
+                            const localData = localStorage.getItem('room_' + code);
+                            resolve(localData ? JSON.parse(localData) : null);
+                        });
+                } else {
+                    // No Supabase, just check localStorage
+                    const localData = localStorage.getItem('room_' + code);
+                    resolve(localData ? JSON.parse(localData) : null);
+                }
+            });
         }
 
         function showNameModal() { document.getElementById('nameModal').classList.add('active'); }
