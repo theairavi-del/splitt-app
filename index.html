@@ -588,7 +588,15 @@ Total $48.15"></textarea>
         };
 
         function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
-        function generateCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+        function generateCode() {
+            // Exclude 0, O, 1, I to avoid confusion
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
         
         function createLocalStub(code) {
             const stub = {
