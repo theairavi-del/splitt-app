@@ -107,6 +107,20 @@
         </div>
     </div>
 
+    <!-- Add Missing Item Modal -->
+    <div class="modal" id="addItemModal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Add Missing Item</h3>
+            <input type="text" class="input mb-3" id="newItemName" placeholder="Item name (e.g., Chicken Wings)">
+            <input type="number" class="input mb-3" id="newItemPrice" placeholder="Price (e.g., 12.99)" step="0.01" min="0">
+            <input type="number" class="input mb-4" id="newItemQty" placeholder="Quantity" value="1" min="1">
+            <div class="flex gap-3">
+                <button class="btn btn-outline flex-1" onclick="hideAddItemModal()">Cancel</button>
+                <button class="btn btn-success flex-1" onclick="addMissingItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Screen 4: Lobby -->
     <div class="screen" id="lobbyScreen">
         <div class="pt-20 px-6">
@@ -164,6 +178,11 @@
                 <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
                     <div class="text-sm mb-2" style="color: var(--text-secondary);">Extracted Items:</div>
                     <div id="extractedItems" class="space-y-2"></div>
+                    
+                    <!-- Add Missing Item Button -->
+                    <button class="btn btn-outline w-full mt-3 mb-2" onclick="showAddItemModal()" style="min-height: 44px; font-size: 14px;">
+                        ➕ Add Missing Item
+                    </button>
                     
                     <!-- Receipt Summary -->
                     <div id="receiptSummary" class="hidden card mt-4" style="border-color: var(--success);">
@@ -279,53 +298,69 @@ Total $48.15"></textarea>
         class ReceiptParser {
           constructor() {
             this.patterns = {
-              price: /[$€£]?\s*(\d{1,3}(?:[,\.]\d{3})*|\d+)(?:[\.,](\d{2}))?/,
+              // More flexible price pattern - handles OCR errors like spaces in prices
+              price: /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/,
+              priceSimple: /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/,
               quantity: /^(\d+)\s*[@x×\*]\s*|^@?\s*(\d+)\s*[:\-]?\s*|^qty[:\s]*(\d+)/i,
-              itemLine: /^(?:(\d+)\s*[@x×\*]\s*)?(.+?)(?:\s+[$€£]?(\d[0-9,\.]+)\s*$)/i,
-              subtotal: /^(?:sub[-\s]?total|subttl|before\s*tax|net|pre[-\s]?tax)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
-              tax: /^(?:tax|vat|gst|hst|sales\s*tax)(?:\s*\(?\d*[%\s)]*)?[:\s]*[$€£]?(\d[0-9,\.]+)/i,
-              tip: /^(?:tip|gratuity|service\s*charge)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
-              total: /^(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[$€£]?(\d[0-9,\.]+)/i,
+              // Match lines with prices at the end - more flexible for OCR
+              itemLine: /^(?:(\d+)\s*[@x×\*]?\s+)?(.+?)(?:\s+[$€£]?\s*(\d[\d\s,\.]+))\s*$/,
+              subtotal: /(?:sub[-\s]?total|subttl|before\s*tax|net|pre[-\s]?tax)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
+              tax: /(?:tax|vat|gst|hst|sales\s*tax)(?:\s*\(?\d*[%\s)]*)?[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
+              tip: /(?:tip|gratuity|service\s*charge)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
+              total: /(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
               // Skip patterns for non-item lines
               skip: /^(?:receipt|invoice|order|ticket|cashier|server|table|guest|thank|call|visit|www\.|http|tel|phone|fax|email|date|time)/i,
-              zipCode: /^\d{5}(-\d{4})?$/,  // ZIP codes
-              phoneNumber: /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,  // Phone numbers
-              address: /^(?:\d+\s+(?:st|ave|rd|dr|blvd|ln|ct|way|pl|trl|hwy)|p\.?o\.?\s*box)/i,  // Addresses
-              pureNumber: /^\d+\.?\d*$/,  // Just a number with no text
-              shortLine: /^.{1,2}$/,  // Very short lines (initials, etc)
+              zipCode: /^\d{5}(-\d{4})?$/,
+              phoneNumber: /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
+              address: /^(?:\d+\s+(?:st|ave|rd|dr|blvd|ln|ct|way|pl|trl|hwy)|p\.?o\.?\s*box)/i,
+              pureNumber: /^\d+\.?\d*$/,
+              shortLine: /^.{1,2}$/,
             };
             
-            // Words that indicate this is NOT a food item
             this.nonItemWords = [
               'zip', 'postal', 'code', 'tel', 'phone', 'fax', 'email', 'www', 'http',
               'date', 'time', 'server', 'cashier', 'check', 'ticket', 'order',
               'payment', 'card', 'credit', 'debit', 'cash', 'change', 'balance',
               'subtotal', 'total', 'tax', 'tip', 'gratuity', 'discount', 'promo',
               'address', 'street', 'ave', 'st', 'rd', 'blvd', 'suite', 'unit',
-              'guests', 'party', 'table', 'seat', 'cover'
+              'guests', 'party', 'table', 'seat', 'cover', 'items', 'qty'
             ];
           }
 
+          // Clean up OCR artifacts from price strings
+          cleanPrice(priceStr) {
+            if (!priceStr) return null;
+            // Remove spaces, normalize decimal
+            return priceStr.replace(/\s/g, '').replace(',', '.');
+          }
+
+          // Extract any price from a line
+          extractPrice(line) {
+            // Look for patterns like $12.34, 12.34, $ 12.34, etc.
+            const matches = line.match(/[$€£]?\s*(\d{1,3}(?:[,\.]?\d{3})*)\s*[\.\,]\s*(\d{2})/g);
+            if (matches && matches.length > 0) {
+              // Get the last price on the line (usually the total for that item)
+              const lastMatch = matches[matches.length - 1];
+              const cleaned = this.cleanPrice(lastMatch);
+              const price = parseFloat(cleaned);
+              return isNaN(price) ? null : price;
+            }
+            return null;
+          }
+
           isLikelyItem(name, price, line) {
-            // Must have actual text, not just numbers/symbols
             if (!name || name.length < 2) return false;
-            
-            // Must contain at least one letter
             if (!/[a-zA-Z]/.test(name)) return false;
             
-            // Check for non-item words
             const nameLower = name.toLowerCase();
             for (const word of this.nonItemWords) {
               if (nameLower.includes(word)) return false;
             }
             
-            // Price should be reasonable for a food item (between $0.50 and $500)
-            if (price < 0.5 || price > 500) return false;
+            // More lenient price range
+            if (price < 0.1 || price > 1000) return false;
             
-            // Shouldn't look like a date
             if (/\d{1,2}[\/\-\.]\d{1,2}/.test(name)) return false;
-            
-            // Shouldn't look like a time
             if (/\d{1,2}:\d{2}/.test(name)) return false;
             
             return true;
@@ -333,63 +368,103 @@ Total $48.15"></textarea>
 
           parseReceiptText(text) {
             if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
-            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 2);
+            
+            // Clean up OCR text - normalize whitespace
+            const lines = text.split(/\r?\n/)
+              .map(l => l.trim())
+              .filter(l => l.length > 1)
+              .map(l => l.replace(/\s+/g, ' ')); // Normalize multiple spaces
             
             let items = [];
             let tax = 0, tip = 0, total = 0;
             let foundTotal = false;
 
-            for (const line of lines) {
-                // Skip obviously non-item lines
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Skip patterns
                 if (this.patterns.skip.test(line)) continue;
                 if (this.patterns.zipCode.test(line)) continue;
                 if (this.patterns.phoneNumber.test(line)) continue;
                 if (this.patterns.address.test(line)) continue;
                 if (this.patterns.pureNumber.test(line)) continue;
+                if (line.length < 3) continue;
                 
-                // Check for tax/tip/total first
-                const taxMatch = line.match(this.patterns.tax);
-                if (taxMatch) { 
-                  const t = parseFloat(taxMatch[1].replace(',', ''));
-                  if (!isNaN(t)) tax = t;
-                  continue; 
+                // Check for tax/tip/total with more flexible matching
+                const lineLower = line.toLowerCase();
+                
+                if (lineLower.includes('tax') && !lineLower.includes('subtotal')) {
+                  const price = this.extractPrice(line);
+                  if (price && price > 0 && price < 100) {
+                    tax = price;
+                    continue;
+                  }
                 }
                 
-                const tipMatch = line.match(this.patterns.tip);
-                if (tipMatch) { 
-                  const t = parseFloat(tipMatch[1].replace(',', ''));
-                  if (!isNaN(t)) tip = t;
-                  continue; 
+                if (lineLower.includes('tip') || lineLower.includes('gratuity')) {
+                  const price = this.extractPrice(line);
+                  if (price && price > 0 && price < 200) {
+                    tip = price;
+                    continue;
+                  }
                 }
                 
-                const totalMatch = line.match(this.patterns.total);
-                if (totalMatch) { 
-                  const t = parseFloat(totalMatch[1].replace(',', ''));
-                  if (!isNaN(t)) total = t;
-                  foundTotal = true;
-                  continue; 
+                if ((lineLower.includes('total') || lineLower.includes('amount due')) && 
+                    !lineLower.includes('subtotal')) {
+                  const price = this.extractPrice(line);
+                  if (price && price > 1) {
+                    total = price;
+                    foundTotal = true;
+                    continue;
+                  }
                 }
 
-                // Skip lines after we've seen the total (usually payment info)
                 if (foundTotal) continue;
 
-                // Try to match item pattern
-                const itemMatch = line.match(this.patterns.itemLine);
+                // Try to extract item
+                // First, try the pattern match
+                let itemMatch = line.match(this.patterns.itemLine);
+                
+                // If that fails, try to find any price at the end
+                let price = this.extractPrice(line);
+                let name = null;
+                let qty = 1;
+                
                 if (itemMatch) {
-                    const qty = parseInt(itemMatch[1] || "1");
-                    const name = itemMatch[2].trim();
-                    const price = parseFloat(itemMatch[3].replace(',', ''));
-                    
-                    if (this.isLikelyItem(name, price, line)) {
-                        items.push({ name, price, quantity: qty });
-                    }
+                  qty = parseInt(itemMatch[1] || "1");
+                  name = itemMatch[2].trim();
+                  // Use extracted price if pattern price is invalid
+                  const patternPrice = parseFloat(this.cleanPrice(itemMatch[3]));
+                  if (!isNaN(patternPrice) && patternPrice > 0) {
+                    price = patternPrice;
+                  }
+                } else if (price) {
+                  // Try to extract name as everything before the price
+                  const priceIndex = line.lastIndexOf(price.toString().replace('.', '.'));
+                  if (priceIndex > 0) {
+                    name = line.substring(0, priceIndex).trim();
+                    // Remove currency symbols from name
+                    name = name.replace(/[$€£]\s*$/, '').trim();
+                  }
+                }
+                
+                if (name && price && this.isLikelyItem(name, price, line)) {
+                  items.push({ name, price, quantity: qty });
                 }
             }
             
-            // Sort items by price (descending) - usually main items first
-            items.sort((a, b) => b.price - a.price);
+            // Remove duplicates (same name similar price)
+            const uniqueItems = [];
+            const seen = new Set();
+            for (const item of items) {
+              const key = item.name.toLowerCase() + '_' + Math.round(item.price);
+              if (!seen.has(key)) {
+                seen.add(key);
+                uniqueItems.push(item);
+              }
+            }
             
-            return { items, tax, tip, total };
+            return { items: uniqueItems, tax, tip, total };
           }
         }
 
@@ -771,6 +846,55 @@ Total $48.15"></textarea>
                 document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
                 document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
             }
+        }
+
+        function showAddItemModal() {
+            document.getElementById('addItemModal').classList.add('active');
+            document.getElementById('newItemName').focus();
+        }
+
+        function hideAddItemModal() {
+            document.getElementById('addItemModal').classList.remove('active');
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemPrice').value = '';
+            document.getElementById('newItemQty').value = '1';
+        }
+
+        function addMissingItem() {
+            const name = document.getElementById('newItemName').value.trim();
+            const price = parseFloat(document.getElementById('newItemPrice').value);
+            const qty = parseInt(document.getElementById('newItemQty').value) || 1;
+            
+            if (!name || isNaN(price) || price <= 0) {
+                alert('Please enter a valid item name and price');
+                return;
+            }
+            
+            extractedItemsFromImage.push({ name, price, quantity: qty });
+            renderExtractedItems();
+            
+            // Recalculate summary
+            const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+            const taxItem = extractedItemsFromImage.find(i => i.isTax);
+            const tipItem = extractedItemsFromImage.find(i => i.isTip);
+            const subtotal = foodItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = taxItem ? taxItem.price : 0;
+            const tip = tipItem ? tipItem.price : 0;
+            const total = subtotal + tax + tip;
+            
+            document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('scannedTax').textContent = '$' + tax.toFixed(2);
+            document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
+            document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('receiptSummary').classList.remove('hidden');
+            
+            // Enable continue button
+            const continueBtn = document.getElementById('continueBtn');
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            continueBtn.textContent = '✓ Continue';
+            
+            hideAddItemModal();
         }
 
         function processReceipt() {
