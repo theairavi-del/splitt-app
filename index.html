@@ -134,6 +134,18 @@
                 <div class="text-sm mb-3" style="color: var(--text-secondary);">Who's here:</div>
                 <div class="avatar-grid" id="playerList"></div>
             </div>
+            <!-- Payment Methods (Host Only) -->
+            <div class="card mb-6" id="paymentSection" style="display: none;">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">Your Payment Links:</div>
+                <div class="space-y-3">
+                    <input type="text" class="input" id="venmoLink" placeholder="Venmo: @username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="cashappLink" placeholder="Cash App: $username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="paypalLink" placeholder="PayPal: paypal.me/username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="applePayLink" placeholder="Apple Pay: Phone or Email" onchange="savePaymentMethods()">
+                </div>
+                <div class="text-xs mt-2" style="color: var(--text-secondary);">Friends will see these when it's time to pay</div>
+            </div>
+
             <div class="space-y-3">
                 <button class="btn btn-success w-full" id="startBtn" onclick="goToReceipt()" style="display: none;">Start Splitting</button>
                 <button class="btn btn-outline w-full" onclick="shareRoom()">Share Link</button>
@@ -267,6 +279,13 @@ Total $48.15"></textarea>
                     <div class="flex justify-between"><span style="color: var(--text-secondary);">Tip</span><span id="yourTip">$0.00</span></div>
                 </div>
             </div>
+
+            <!-- Payment Methods (for non-hosts) -->
+            <div class="card mb-6" id="payHostSection" style="display: none;">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">PAY THE HOST:</div>
+                <div id="paymentButtons" class="space-y-3"></div>
+            </div>
+
             <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good ✓</button>
         </div>
     </div>
@@ -815,7 +834,38 @@ Total $48.15"></textarea>
             showScreen('lobby');
             document.getElementById('lobbyCode').textContent = state.roomCode;
             document.getElementById('startBtn').style.display = state.isHost ? 'block' : 'none';
+            
+            // Show payment section for host only
+            const paymentSection = document.getElementById('paymentSection');
+            if (state.isHost) {
+                paymentSection.style.display = 'block';
+                loadPaymentMethods();
+            } else {
+                paymentSection.style.display = 'none';
+            }
+            
             renderPlayers();
+        }
+
+        function savePaymentMethods() {
+            if (!state.isHost) return;
+            
+            state.session.paymentMethods = {
+                venmo: document.getElementById('venmoLink').value,
+                cashapp: document.getElementById('cashappLink').value,
+                paypal: document.getElementById('paypalLink').value,
+                applepay: document.getElementById('applePayLink').value
+            };
+            saveSession();
+        }
+
+        function loadPaymentMethods() {
+            if (state.session.paymentMethods) {
+                document.getElementById('venmoLink').value = state.session.paymentMethods.venmo || '';
+                document.getElementById('cashappLink').value = state.session.paymentMethods.cashapp || '';
+                document.getElementById('paypalLink').value = state.session.paymentMethods.paypal || '';
+                document.getElementById('applePayLink').value = state.session.paymentMethods.applepay || '';
+            }
         }
 
         function shareRoom() {
@@ -1255,6 +1305,39 @@ Total $48.15"></textarea>
             document.getElementById('yourTax').textContent = '$' + tax.toFixed(2);
             document.getElementById('yourTip').textContent = '$' + tip.toFixed(2);
             document.getElementById('yourTotalDisplay').textContent = '$' + (mySub + tax + tip).toFixed(2);
+
+            // Show payment methods for non-hosts
+            const paySection = document.getElementById('payHostSection');
+            const paymentButtons = document.getElementById('paymentButtons');
+            
+            if (!state.isHost && state.session.paymentMethods) {
+                const pm = state.session.paymentMethods;
+                let buttonsHtml = '';
+                
+                if (pm.venmo) {
+                    const venmoUrl = pm.venmo.startsWith('http') ? pm.venmo : `https://venmo.com/${pm.venmo.replace('@', '')}`;
+                    buttonsHtml += `<a href="${venmoUrl}" target="_blank" class="btn btn-outline w-full" style="background: #008CFF; color: white; border: none;">💸 Pay with Venmo</a>`;
+                }
+                if (pm.cashapp) {
+                    const cashUrl = pm.cashapp.startsWith('http') ? pm.cashapp : `https://cash.app/${pm.cashapp}`;
+                    buttonsHtml += `<a href="${cashUrl}" target="_blank" class="btn btn-outline w-full" style="background: #00D632; color: white; border: none;">💵 Pay with Cash App</a>`;
+                }
+                if (pm.paypal) {
+                    buttonsHtml += `<a href="${pm.paypal}" target="_blank" class="btn btn-outline w-full" style="background: #0070BA; color: white; border: none;">🅿️ Pay with PayPal</a>`;
+                }
+                if (pm.applepay) {
+                    buttonsHtml += `<button class="btn btn-outline w-full" style="background: #000; color: white; border: none;" onclick="alert('Apple Pay: ${pm.applepay}')">🍎 Pay with Apple Pay</button>`;
+                }
+                
+                if (buttonsHtml) {
+                    paymentButtons.innerHTML = buttonsHtml;
+                    paySection.style.display = 'block';
+                } else {
+                    paySection.style.display = 'none';
+                }
+            } else {
+                paySection.style.display = 'none';
+            }
         }
 
         function goToFinal() { state.session.status = 'final'; saveSession(); showScreen('final'); renderFinal(); }
