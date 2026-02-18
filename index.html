@@ -734,6 +734,20 @@ Total $48.15"></textarea>
             showScreen('welcome');
         }
         
+        function leaveRoom() {
+            // Remove user from participants
+            if (state.roomCode && state.userId) {
+                state.session.participants = state.session.participants.filter(p => p.id !== state.userId);
+                saveSession();
+            }
+            // Reset and go back to welcome
+            state.roomCode = null;
+            state.isHost = false;
+            state.userId = null;
+            localStorage.removeItem('splitt_user_state');
+            showScreen('welcome');
+        }
+        
         function initEmojiGrid() {
             const grid = document.getElementById('emojiGrid');
             EMOJIS.forEach((e, i) => {
