@@ -286,7 +286,10 @@ Total $48.15"></textarea>
                 <div id="paymentButtons" class="space-y-3"></div>
             </div>
 
-            <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good ✓</button>
+            <div class="space-y-3">
+                <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good ✓</button>
+                <button class="btn btn-outline w-full" onclick="backToSelection()">← Go Back & Edit</button>
+            </div>
         </div>
     </div>
 
@@ -1342,6 +1345,8 @@ Total $48.15"></textarea>
 
         function goToFinal() { state.session.status = 'final'; saveSession(); showScreen('final'); renderFinal(); }
 
+        function backToSelection() { showScreen('select'); renderItems(); }
+
         function renderFinal() {
             const list = document.getElementById('finalLeaderboard');
             list.innerHTML = '';
@@ -1374,7 +1379,32 @@ Total $48.15"></textarea>
         }
 
         function resetApp() { localStorage.clear(); location.reload(); }
-        function updateUI() { if (state.session.status === 'lobby') renderPlayers(); else if (state.session.status === 'selecting') renderItems(); }
+        function updateUI() {
+            // Check if we need to switch screens based on status
+            const currentScreen = document.querySelector('.screen.active');
+            const currentScreenId = currentScreen ? currentScreen.id : '';
+            
+            if (state.session.status === 'lobby' && currentScreenId !== 'lobbyScreen') {
+                showScreen('lobby');
+                renderPlayers();
+            } else if (state.session.status === 'selecting' && currentScreenId !== 'selectScreen') {
+                showScreen('select');
+                renderItems();
+            } else if (state.session.status === 'final' && currentScreenId !== 'finalScreen') {
+                showScreen('final');
+                renderFinal();
+            } else if (state.session.status === 'receipt' && currentScreenId !== 'receiptScreen') {
+                // Only host should see receipt screen
+                if (state.isHost) {
+                    showScreen('receipt');
+                }
+            } else {
+                // Same screen, just update content
+                if (state.session.status === 'lobby') renderPlayers();
+                else if (state.session.status === 'selecting') renderItems();
+                else if (state.session.status === 'final') renderFinal();
+            }
+        }
     </script>
 </body>
 </html>
