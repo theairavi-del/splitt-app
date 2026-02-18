@@ -297,71 +297,90 @@ Total $48.15"></textarea>
 
         class ReceiptParser {
           constructor() {
-            this.patterns = {
-              // More flexible price pattern - handles OCR errors like spaces in prices
-              price: /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/,
-              priceSimple: /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/,
-              quantity: /^(\d+)\s*[@x×\*]\s*|^@?\s*(\d+)\s*[:\-]?\s*|^qty[:\s]*(\d+)/i,
-              // Match lines with prices at the end - more flexible for OCR
-              itemLine: /^(?:(\d+)\s*[@x×\*]?\s+)?(.+?)(?:\s+[$€£]?\s*(\d[\d\s,\.]+))\s*$/,
-              subtotal: /(?:sub[-\s]?total|subttl|before\s*tax|net|pre[-\s]?tax)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
-              tax: /(?:tax|vat|gst|hst|sales\s*tax)(?:\s*\(?\d*[%\s)]*)?[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
-              tip: /(?:tip|gratuity|service\s*charge)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
-              total: /(?:total|amount\s*due|balance\s*due|grand\s*total)[:\s]*[$€£]?\s*(\d[\d,\s\.]+)/i,
-              // Skip patterns for non-item lines
-              skip: /^(?:receipt|invoice|order|ticket|cashier|server|table|guest|thank|call|visit|www\.|http|tel|phone|fax|email|date|time)/i,
-              zipCode: /^\d{5}(-\d{4})?$/,
-              phoneNumber: /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
-              address: /^(?:\d+\s+(?:st|ave|rd|dr|blvd|ln|ct|way|pl|trl|hwy)|p\.?o\.?\s*box)/i,
-              pureNumber: /^\d+\.?\d*$/,
-              shortLine: /^.{1,2}$/,
-            };
-            
-            this.nonItemWords = [
-              'zip', 'postal', 'code', 'tel', 'phone', 'fax', 'email', 'www', 'http',
-              'date', 'time', 'server', 'cashier', 'check', 'ticket', 'order',
-              'payment', 'card', 'credit', 'debit', 'cash', 'change', 'balance',
-              'subtotal', 'total', 'tax', 'tip', 'gratuity', 'discount', 'promo',
-              'address', 'street', 'ave', 'st', 'rd', 'blvd', 'suite', 'unit',
-              'guests', 'party', 'table', 'seat', 'cover', 'items', 'qty'
-            ];
+            // Simple approach: find all prices, identify which are tax/tip/total, rest are items
           }
 
-          // Clean up OCR artifacts from price strings
-          cleanPrice(priceStr) {
-            if (!priceStr) return null;
-            // Remove spaces, normalize decimal
-            return priceStr.replace(/\s/g, '').replace(',', '.');
-          }
-
-          // Extract any price from a line
-          extractPrice(line) {
-            // Look for patterns like $12.34, 12.34, $ 12.34, etc.
-            const matches = line.match(/[$€£]?\s*(\d{1,3}(?:[,\.]?\d{3})*)\s*[\.\,]\s*(\d{2})/g);
-            if (matches && matches.length > 0) {
-              // Get the last price on the line (usually the total for that item)
-              const lastMatch = matches[matches.length - 1];
-              const cleaned = this.cleanPrice(lastMatch);
-              const price = parseFloat(cleaned);
-              return isNaN(price) ? null : price;
+          extractAllPrices(text) {
+            // Find all dollar amounts in the text
+            const priceRegex = /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/g;
+            const matches = [];
+            let match;
+            while ((match = priceRegex.exec(text)) !== null) {
+              const raw = match[0];
+              const dollars = match[1].replace(/[,\s]/g, '');
+              const cents = match[2];
+              const value = parseFloat(`${dollars}.${cents}`);
+              // Find the line this price is on
+              const lineStart = text.lastIndexOf('\n', match.index) + 1;
+              const lineEnd = text.indexOf('\n', match.index);
+              const line = text.substring(lineStart, lineEnd > -1 ? lineEnd : text.length).trim();
+              matches.push({ raw, value, line, index: match.index });
             }
-            return null;
+            return matches;
           }
 
-          isLikelyItem(name, price, line) {
+          identifyLineType(line) {
+            const lower = line.toLowerCase();
+            
+            // Check for total (but not subtotal)
+            if ((lower.includes('total') || lower.includes('amount due') || lower.includes('balance')) && 
+                !lower.includes('subtotal')) {
+              return 'total';
+            }
+            
+            // Check for tax
+            if (lower.includes('tax') || lower.includes('vat') || lower.includes('gst')) {
+              return 'tax';
+            }
+            
+            // Check for tip/gratuity
+            if (lower.includes('tip') || lower.includes('gratuity') || lower.includes('service charge')) {
+              return 'tip';
+            }
+            
+            // Check for subtotal
+            if (lower.includes('subtotal') || lower.includes('sub total')) {
+              return 'subtotal';
+            }
+            
+            return 'item';
+          }
+
+          cleanItemName(line, price) {
+            // Remove the price from the line
+            let name = line.replace(/[$€£]?\s*\d[\d,\s]*[\.\,]\s*\d{2}/, '').trim();
+            
+            // Remove common prefixes
+            name = name.replace(/^(\d+\s*[@x×\*]?\s+)/, ''); // Remove quantities like "2x "
+            name = name.replace(/^[@#]\s*/, ''); // Remove @ or # at start
+            
+            // Clean up
+            name = name.replace(/\s+/g, ' ').trim();
+            
+            return name;
+          }
+
+          isValidItem(name) {
             if (!name || name.length < 2) return false;
+            
+            // Must have at least one letter
             if (!/[a-zA-Z]/.test(name)) return false;
             
-            const nameLower = name.toLowerCase();
-            for (const word of this.nonItemWords) {
-              if (nameLower.includes(word)) return false;
+            // Skip obvious non-items
+            const lower = name.toLowerCase();
+            const skipWords = ['total', 'tax', 'tip', 'subtotal', 'phone', 'fax', 'email', 
+                             'www', 'http', 'date', 'time', 'server', 'cashier', 'payment',
+                             'card', 'credit', 'debit', 'change', 'balance', 'zip', 'code'];
+            
+            for (const word of skipWords) {
+              if (lower.includes(word)) return false;
             }
             
-            // More lenient price range
-            if (price < 0.1 || price > 1000) return false;
+            // Skip if looks like an address (starts with number and street type)
+            if (/^\d+\s+(st|ave|rd|dr|blvd|ln|ct|way|pl)/i.test(lower)) return false;
             
-            if (/\d{1,2}[\/\-\.]\d{1,2}/.test(name)) return false;
-            if (/\d{1,2}:\d{2}/.test(name)) return false;
+            // Skip if it's just a ZIP code
+            if (/^\d{5}(-\d{4})?$/.test(name)) return false;
             
             return true;
           }
@@ -369,99 +388,79 @@ Total $48.15"></textarea>
           parseReceiptText(text) {
             if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
             
-            // Clean up OCR text - normalize whitespace
-            const lines = text.split(/\r?\n/)
-              .map(l => l.trim())
-              .filter(l => l.length > 1)
-              .map(l => l.replace(/\s+/g, ' ')); // Normalize multiple spaces
+            const prices = this.extractAllPrices(text);
             
             let items = [];
-            let tax = 0, tip = 0, total = 0;
-            let foundTotal = false;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Skip patterns
-                if (this.patterns.skip.test(line)) continue;
-                if (this.patterns.zipCode.test(line)) continue;
-                if (this.patterns.phoneNumber.test(line)) continue;
-                if (this.patterns.address.test(line)) continue;
-                if (this.patterns.pureNumber.test(line)) continue;
-                if (line.length < 3) continue;
-                
-                // Check for tax/tip/total with more flexible matching
-                const lineLower = line.toLowerCase();
-                
-                if (lineLower.includes('tax') && !lineLower.includes('subtotal')) {
-                  const price = this.extractPrice(line);
-                  if (price && price > 0 && price < 100) {
-                    tax = price;
-                    continue;
-                  }
-                }
-                
-                if (lineLower.includes('tip') || lineLower.includes('gratuity')) {
-                  const price = this.extractPrice(line);
-                  if (price && price > 0 && price < 200) {
-                    tip = price;
-                    continue;
-                  }
-                }
-                
-                if ((lineLower.includes('total') || lineLower.includes('amount due')) && 
-                    !lineLower.includes('subtotal')) {
-                  const price = this.extractPrice(line);
-                  if (price && price > 1) {
-                    total = price;
-                    foundTotal = true;
-                    continue;
-                  }
-                }
-
-                if (foundTotal) continue;
-
-                // Try to extract item
-                // First, try the pattern match
-                let itemMatch = line.match(this.patterns.itemLine);
-                
-                // If that fails, try to find any price at the end
-                let price = this.extractPrice(line);
-                let name = null;
-                let qty = 1;
-                
-                if (itemMatch) {
-                  qty = parseInt(itemMatch[1] || "1");
-                  name = itemMatch[2].trim();
-                  // Use extracted price if pattern price is invalid
-                  const patternPrice = parseFloat(this.cleanPrice(itemMatch[3]));
-                  if (!isNaN(patternPrice) && patternPrice > 0) {
-                    price = patternPrice;
-                  }
-                } else if (price) {
-                  // Try to extract name as everything before the price
-                  const priceIndex = line.lastIndexOf(price.toString().replace('.', '.'));
-                  if (priceIndex > 0) {
-                    name = line.substring(0, priceIndex).trim();
-                    // Remove currency symbols from name
-                    name = name.replace(/[$€£]\s*$/, '').trim();
-                  }
-                }
-                
-                if (name && price && this.isLikelyItem(name, price, line)) {
-                  items.push({ name, price, quantity: qty });
-                }
+            let tax = 0;
+            let tip = 0;
+            let total = 0;
+            let subtotal = 0;
+            
+            // Sort prices by value (largest first) to identify total more easily
+            const sortedPrices = [...prices].sort((a, b) => b.value - a.value);
+            
+            // The largest price is usually the total
+            if (sortedPrices.length > 0) {
+              const largest = sortedPrices[0];
+              const largestType = this.identifyLineType(largest.line);
+              
+              // If the largest amount's line says "total", it's definitely the total
+              if (largestType === 'total' || largest.value > 10) {
+                total = largest.value;
+              }
             }
             
-            // Remove duplicates (same name similar price)
+            // Process each price
+            for (const price of prices) {
+              const type = this.identifyLineType(price.line);
+              
+              if (type === 'total') {
+                total = price.value;
+              } else if (type === 'tax') {
+                tax = price.value;
+              } else if (type === 'tip') {
+                tip = price.value;
+              } else if (type === 'subtotal') {
+                subtotal = price.value;
+              } else {
+                // It's likely an item
+                const name = this.cleanItemName(price.line, price.value);
+                
+                // Skip if price equals total, tax, or tip (already counted)
+                if (price.value === total || price.value === tax || price.value === tip) {
+                  continue;
+                }
+                
+                // Skip very small amounts (likely not items)
+                if (price.value < 0.5) continue;
+                
+                if (this.isValidItem(name)) {
+                  // Try to extract quantity
+                  let qty = 1;
+                  const qtyMatch = price.line.match(/^(\d+)\s*[@x×\*]/i);
+                  if (qtyMatch) {
+                    qty = parseInt(qtyMatch[1]);
+                  }
+                  
+                  items.push({ name, price: price.value, quantity: qty });
+                }
+              }
+            }
+            
+            // Remove duplicates
             const uniqueItems = [];
             const seen = new Set();
             for (const item of items) {
-              const key = item.name.toLowerCase() + '_' + Math.round(item.price);
-              if (!seen.has(key)) {
+              const key = item.name.toLowerCase().trim();
+              if (!seen.has(key) && item.name.length > 0) {
                 seen.add(key);
                 uniqueItems.push(item);
               }
+            }
+            
+            // If we found a total but no subtotal, calculate it
+            if (total > 0 && subtotal === 0) {
+              subtotal = total - tax - tip;
             }
             
             return { items: uniqueItems, tax, tip, total };
