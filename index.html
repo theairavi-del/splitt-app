@@ -9,6 +9,7 @@
     <title>SPLITT v3 - Split Bills Instantly</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --bg: #0a0a0a;
@@ -1107,6 +1108,51 @@ Total $48.15"></textarea>
 
         function resetApp() { localStorage.clear(); location.reload(); }
         function updateUI() { if (state.session.status === 'lobby') renderPlayers(); else if (state.session.status === 'selecting') renderItems(); }
+        
+        // SUPABASE SETUP
+        var SUPABASE_URL = 'https://idjjrpaixhhkpattgwbj.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkampycGFpeGhoa3BhdHRnd2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzODEzNjcsImV4cCI6MjA4Njk1NzM2N30.VobYBbh2A8pLzaX9f2YaOYQ0ee5a1c6yI4NophzYHOY';
+        var supabaseClient = null;
+        
+        if (typeof supabase !== 'undefined') {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('Supabase ready');
+            } catch(e) {
+                console.log('Supabase failed');
+            }
+        }
+        
+        // Override saveSession to also save to Supabase
+        var originalSaveSession = saveSession;
+        saveSession = function() {
+            originalSaveSession();
+            if (supabaseClient && state.roomCode) {
+                supabaseClient.from('rooms').upsert({
+                    code: state.roomCode,
+                    data: state.session,
+                    created_at: new Date().toISOString()
+                }).then(function() {}).catch(function() {});
+            }
+        };
+        
+        // Add Supabase sync to startSync
+        var originalStartSync = startSync;
+        startSync = function() {
+            originalStartSync();
+            if (supabaseClient && state.roomCode) {
+                setInterval(function() {
+                    supabaseClient.from('rooms').select('*').eq('code', state.roomCode).single()
+                        .then(function(result) {
+                            if (result.data && result.data.data.lastModified > state.session.lastModified) {
+                                state.session = result.data.data;
+                                localStorage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
+                                updateUI();
+                            }
+                        }).catch(function() {});
+                }, 3000);
+            }
+        };
     </script>
 </body>
 </html>
