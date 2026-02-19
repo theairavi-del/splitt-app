@@ -1183,6 +1183,27 @@ Total $48.15"></textarea>
             reader.readAsDataURL(file);
         }
 
+        // Google Vision API Configuration
+        const GOOGLE_VISION_API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your API key
+        
+        async function scanWithGoogleVision(imageBase64) {
+            const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requests: [{
+                        image: { content: imageBase64.split(',')[1] },
+                        features: [{ type: 'TEXT_DETECTION' }]
+                    }]
+                })
+            });
+            
+            if (!response.ok) throw new Error('Google Vision API failed');
+            
+            const data = await response.json();
+            return data.responses[0]?.fullTextAnnotation?.text || '';
+        }
+        
         async function simulateOCR() {
             const img = document.getElementById('previewImg');
             const scanningOverlay = document.getElementById('scanningOverlay');
@@ -1193,20 +1214,34 @@ Total $48.15"></textarea>
             continueBtn.style.opacity = '0.5';
             continueBtn.textContent = '🔍 Scanning...';
             
+            let text = '';
+            
             try {
-                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">[Read] Reading receipt...</div>';
+                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">[Read] Reading receipt with AI...</div>';
                 
-                // Use Tesseract.js for real OCR
-                const result = await Tesseract.recognize(img.src, 'eng', {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            scanningOverlay.innerHTML = `<div class="text-center text-green-400 font-bold">🔍 ${Math.round(m.progress * 100)}%</div>`;
-                        }
+                // Try Google Vision API first (if key is configured)
+                if (GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY !== 'YOUR_API_KEY_HERE') {
+                    try {
+                        text = await scanWithGoogleVision(img.src);
+                        console.log('Google Vision OCR Result:', text);
+                    } catch (gvError) {
+                        console.log('Google Vision failed, falling back to Tesseract:', gvError);
+                        scanningOverlay.innerHTML = '<div class="text-center text-yellow-400 font-bold">[AI] Falling back to local OCR...</div>';
                     }
-                });
+                }
                 
-                const text = result.data.text;
-                console.log('OCR Result:', text);
+                // Fallback to Tesseract if Google Vision failed or not configured
+                if (!text) {
+                    const result = await Tesseract.recognize(img.src, 'eng', {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                scanningOverlay.innerHTML = `<div class="text-center text-green-400 font-bold">🔍 ${Math.round(m.progress * 100)}%</div>`;
+                            }
+                        }
+                    });
+                    text = result.data.text;
+                    console.log('Tesseract OCR Result:', text);
+                }
                 
                 // Parse the OCR text
                 const parsed = parser.parseReceiptText(text);
