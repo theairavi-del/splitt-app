@@ -55,6 +55,8 @@
         .avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--surface-light); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 3px solid var(--border); animation: popIn 0.3s ease; }
         .avatar.me { border-color: var(--primary); animation: popIn 0.3s ease, pulse 2s infinite; }
         .claimant-tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--surface-light); border-radius: 20px; font-size: 13px; margin: 4px; }
+        .item-card { background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .item-card.unclaimed { border-color: var(--warning); animation: glow 2s infinite; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -67,6 +69,10 @@
 
     <!-- Screen 1: Welcome -->
     <div class="screen active" id="welcomeScreen">
+        <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
+        <div class="absolute top-0 left-0 right-0 p-4 text-center">
+            <div class="text-2xl font-black cursor-pointer inline-block" style="color: var(--primary);" onclick="goHome()" title="SPLITT - Click to refresh">SPLITT</div>
+        </div>
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
             <h1 class="text-4xl font-black mb-3">Split bills<br><span style="color: var(--primary);">in seconds</span></h1>
@@ -591,6 +597,21 @@ Total $48.15"></textarea>
                 // Auto-join from shared link - validate room exists first
                 const code = roomFromUrl.toUpperCase();
                 
+                // BUG 9 FIX: Check if user was previously kicked from this room
+                const kickedKey = 'kicked_from_' + code;
+                const wasKicked = storage.getItem(kickedKey);
+                
+                if (wasKicked) {
+                    alert('You were removed from this room by the host. You cannot rejoin.');
+                    // Clear the URL param
+                    if (window.history.replaceState) {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    initEmojiGrid();
+                    startSync();
+                    return;
+                }
+                
                 // Validate room exists before proceeding (Bug 8 fix)
                 tryFetchRoom(code).then((roomData) => {
                     if (roomData) {
@@ -671,6 +692,9 @@ Total $48.15"></textarea>
             setInterval(() => {
                 if (!state.roomCode) return;
                 
+                // BUG 9 FIX: Check if current user was kicked before updating
+                if (checkIfKicked()) return;
+                
                 // First check storage (fast)
                 const localData = storage.getItem('room_' + state.roomCode);
                 if (localData) {
@@ -731,9 +755,48 @@ Total $48.15"></textarea>
         
         // Go home function for logo click (Bug 1 fix)
         function goHome() {
+            // BUG 10 FIX: If on welcome screen already, just refresh/reset
+            const currentScreen = document.querySelector('.screen.active');
+            if (currentScreen && currentScreen.id === 'welcomeScreen') {
+                // Already on welcome, clear any state and reload
+                clearAllRoomState();
+                location.reload();
+                return;
+            }
+            
             if (confirm('Leave current split and return to welcome screen?')) {
                 leaveRoom();
             }
+        }
+
+        // BUG 12 FIX: Clear all room state for fresh session
+        function clearAllRoomState() {
+            // Clear all room-related localStorage keys
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('room_') || key === 'splitt_user_state')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => storage.removeItem(key));
+            
+            // Reset state
+            state.roomCode = null;
+            state.userId = null;
+            state.userName = null;
+            state.userEmoji = null;
+            state.isHost = false;
+            state.session = {
+                participants: [],
+                items: [],
+                tax: 0,
+                tip: 0,
+                selections: {},
+                status: 'lobby',
+                lastModified: 0
+            };
+            extractedItemsFromImage = [];
         }
         
         // Initialize history state
@@ -745,6 +808,9 @@ Total $48.15"></textarea>
         });
 
         function createRoom() {
+            // BUG 12 FIX: Always create fresh session, clear any previous room state
+            clearAllRoomState();
+            
             state.roomCode = generateCode();
             state.isHost = true;
             state.userId = generateId();
@@ -798,6 +864,19 @@ Total $48.15"></textarea>
             // Validate room exists before joining (Bug 2 fix)
             tryFetchRoom(code).then((roomData) => {
                 if (roomData) {
+                    // BUG 9 FIX: Check if user was previously kicked from this room
+                    // We need to check localStorage for a kicked flag
+                    const kickedKey = 'kicked_from_' + code;
+                    const wasKicked = storage.getItem(kickedKey);
+                    
+                    if (wasKicked) {
+                        alert('You were removed from this room by the host. You cannot rejoin.');
+                        // Clear the PIN inputs
+                        [1,2,3,4,5,6].forEach(i => document.getElementById('p'+i).value = '');
+                        document.getElementById('p1').focus();
+                        return;
+                    }
+                    
                     // Room exists - proceed to join
                     state.session = roomData;
                     state.roomCode = code;
@@ -868,6 +947,11 @@ Total $48.15"></textarea>
                 saveSession();
             }
             // Reset and go back to welcome
+            // BUG 10 FIX: Clear kicked flags for this room so user can join other rooms
+            if (state.roomCode) {
+                storage.removeItem('kicked_from_' + state.roomCode);
+                storage.removeItem('kicked_user_' + state.userId + '_' + state.roomCode);
+            }
             state.roomCode = null;
             state.isHost = false;
             state.userId = null;
@@ -960,9 +1044,78 @@ Total $48.15"></textarea>
             state.session.participants.forEach(p => {
                 const d = document.createElement('div');
                 d.className = 'flex flex-col items-center gap-1';
-                d.innerHTML = `<div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div><div class="text-xs text-gray-400">${p.name}</div>`;
+                
+                // BUG 9 FIX: Add kick button for host (only for other users, not self)
+                const showKickButton = state.isHost && p.id !== state.userId;
+                
+                d.innerHTML = `
+                    <div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div>
+                    <div class="text-xs text-gray-400">${p.name}</div>
+                    ${showKickButton ? `<button onclick="kickUser('${p.id}')" class="text-xs text-red-400 hover:text-red-300 mt-1" style="background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px;">[Remove]</button>` : ''}
+                `;
                 list.appendChild(d);
             });
+        }
+        
+        // BUG 9 FIX: Kick/remove user function
+        function kickUser(userId) {
+            if (!state.isHost) return;
+            
+            const userToKick = state.session.participants.find(p => p.id === userId);
+            if (!userToKick) return;
+            
+            if (!confirm(`Remove ${userToKick.name} from the room?`)) return;
+            
+            // Remove user from participants
+            state.session.participants = state.session.participants.filter(p => p.id !== userId);
+            
+            // Remove user's selections
+            for (const itemId in state.session.selections) {
+                state.session.selections[itemId] = state.session.selections[itemId].filter(s => s.userId !== userId);
+            }
+            
+            // Mark this user as kicked so they can't rejoin (store in session)
+            if (!state.session.kickedUsers) state.session.kickedUsers = [];
+            state.session.kickedUsers.push(userId);
+            
+            // Also store in localStorage with user-specific key for cross-session tracking
+            storage.setItem('kicked_user_' + userId + '_' + state.roomCode, 'true');
+            
+            saveSession();
+            renderPlayers();
+        }
+        
+        // BUG 9 FIX: Check if current user was kicked and show message
+        function checkIfKicked() {
+            if (!state.roomCode || !state.userId) return false;
+            
+            // Check if user is still in participants list
+            const stillInRoom = state.session.participants.find(p => p.id === state.userId);
+            
+            // Check if user was marked as kicked
+            const kickedFlag = storage.getItem('kicked_user_' + state.userId + '_' + state.roomCode);
+            const inKickedList = state.session.kickedUsers && state.session.kickedUsers.includes(state.userId);
+            
+            if ((!stillInRoom && inKickedList) || kickedFlag) {
+                // User was kicked
+                alert('You were removed from this room by the host.');
+                
+                // Clear kicked flag
+                storage.removeItem('kicked_user_' + state.userId + '_' + state.roomCode);
+                
+                // Mark as kicked to prevent rejoin
+                storage.setItem('kicked_from_' + state.roomCode, 'true');
+                
+                // Reset and go home
+                state.roomCode = null;
+                state.isHost = false;
+                state.userId = null;
+                storage.removeItem('splitt_user_state');
+                showScreen('welcome');
+                return true;
+            }
+            
+            return false;
         }
 
         function goToReceipt() { state.session.status = 'receipt'; saveSession(); showScreen('receipt'); }
@@ -1291,12 +1444,14 @@ Total $48.15"></textarea>
             list.innerHTML = '';
             let mySub = 0;
             let orphans = 0;
+            const numParticipants = state.session.participants.length || 1;
 
             state.session.items.forEach(it => {
                 const selections = state.session.selections[it.id] || [];
                 const mySel = selections.find(s => s.userId === state.userId);
                 if (selections.length === 0) orphans++;
 
+                // BUG 11 FIX: Items split only among people who selected them
                 if (mySel) {
                     if (mySel.type === 'solo') mySub += it.price;
                     else mySub += it.price / selections.length;
@@ -1325,9 +1480,11 @@ Total $48.15"></textarea>
                 list.appendChild(d);
             });
 
-            const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
-            const myShare = totalFood > 0 ? (mySub / totalFood) : 0;
-            const myTotal = mySub + (state.session.tax * myShare) + (state.session.tip * myShare);
+            // BUG 11 FIX: Tax and Tip split equally among ALL users
+            const myTaxShare = state.session.tax / numParticipants;
+            const myTipShare = state.session.tip / numParticipants;
+            const myTotal = mySub + myTaxShare + myTipShare;
+            
             document.getElementById('runningTotal').textContent = '$' + myTotal.toFixed(2);
             
             document.getElementById('orphanAlert').classList.toggle('hidden', orphans === 0);
@@ -1358,21 +1515,22 @@ Total $48.15"></textarea>
             let mySub = 0;
             const itemsList = document.getElementById('yourItems');
             itemsList.innerHTML = '';
+            const numParticipants = state.session.participants.length || 1;
 
             state.session.items.forEach(it => {
                 const selections = state.session.selections[it.id] || [];
                 const mySel = selections.find(s => s.userId === state.userId);
                 if (mySel) {
+                    // BUG 11 FIX: Items split only among people who selected them
                     let amt = mySel.type === 'solo' ? it.price : it.price / selections.length;
                     mySub += amt;
                     itemsList.innerHTML += `<div class="flex justify-between text-sm"><span>${it.name}</span><span>$${amt.toFixed(2)}</span></div>`;
                 }
             });
 
-            const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
-            const myShare = totalFood > 0 ? (mySub / totalFood) : 0;
-            const tax = state.session.tax * myShare;
-            const tip = state.session.tip * myShare;
+            // BUG 11 FIX: Tax and Tip split equally among ALL users
+            const tax = state.session.tax / numParticipants;
+            const tip = state.session.tip / numParticipants;
             
             document.getElementById('yourSubtotal').textContent = '$' + mySub.toFixed(2);
             document.getElementById('yourTax').textContent = '$' + tax.toFixed(2);
@@ -1420,16 +1578,20 @@ Total $48.15"></textarea>
         function renderFinal() {
             const list = document.getElementById('finalLeaderboard');
             list.innerHTML = '';
+            const numParticipants = state.session.participants.length || 1;
+            
             const totals = state.session.participants.map(p => {
                 let sub = 0;
                 state.session.items.forEach(it => {
                     const sels = state.session.selections[it.id] || [];
                     const s = sels.find(x => x.userId === p.id);
+                    // BUG 11 FIX: Items split only among people who selected them
                     if (s) sub += (s.type === 'solo' ? it.price : it.price / sels.length);
                 });
-                const totalFood = state.session.items.reduce((a, b) => a + b.price, 0);
-                const share = totalFood > 0 ? (sub / totalFood) : 0;
-                return { ...p, total: sub + (state.session.tax * share) + (state.session.tip * share) };
+                // BUG 11 FIX: Tax and Tip split equally among ALL users
+                const taxShare = state.session.tax / numParticipants;
+                const tipShare = state.session.tip / numParticipants;
+                return { ...p, total: sub + taxShare + tipShare };
             }).sort((a, b) => b.total - a.total);
 
             totals.forEach((t, i) => {
