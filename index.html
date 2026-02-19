@@ -153,28 +153,30 @@
         }
         .avatar-remove {
             position: absolute;
-            top: -4px;
-            right: -4px;
-            width: 22px;
-            height: 22px;
+            top: -6px;
+            right: -6px;
+            width: 28px;
+            height: 28px;
             background: var(--error);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 18px;
+            font-weight: 700;
             color: white;
             cursor: pointer;
-            border: 2px solid var(--surface);
+            border: 3px solid var(--surface);
             transition: all 0.15s;
             z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
         .avatar-remove:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
             background: #dc2626;
         }
         .avatar-remove:active {
-            transform: scale(0.95);
+            transform: scale(0.9);
         }
     </style>
 </head>
@@ -295,7 +297,7 @@
         <div class="pt-20 px-6 flex-1 flex flex-col">
             <h2 class="text-2xl font-bold mb-4">Add Receipt</h2>
             <div class="flex gap-2 mb-4">
-                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">[Cam] Camera</button>
+                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">Camera</button>
                 <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px;">Paste</button>
                 <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('manual')" id="tab-manual" style="min-height: 44px;">Manual</button>
             </div>
@@ -308,22 +310,27 @@
                     <img id="previewImg" class="w-full max-h-64 object-contain rounded-xl mb-4 bg-black">
                     <div id="scanningOverlay" class="hidden relative">
                         <div class="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/20 to-transparent h-8 animate-pulse"></div>
-                        <div class="text-center text-green-400 font-bold">[Scan] Scanning receipt...</div>
+                        <div class="text-center text-green-400 font-bold">Scanning receipt...</div>
+                    </div>
+                    <!-- Rescan buttons -->
+                    <div id="rescanButtons" class="hidden flex gap-3 mt-2">
+                        <button class="btn btn-outline flex-1" onclick="rescanReceipt()" style="min-height: 44px; font-size: 14px;">Retake Photo</button>
+                        <button class="btn btn-outline flex-1" onclick="rescanGallery()" style="min-height: 44px; font-size: 14px;">Choose Different</button>
                     </div>
                 </div>
                 <div id="cameraButtons" class="flex-1 flex flex-col justify-center gap-4">
                     <div id="ocrLoading" class="hidden text-center mb-4">
-                        <div class="text-yellow-400 font-bold mb-2">[Box] Loading OCR engine...</div>
+                        <div class="text-yellow-400 font-bold mb-2">Loading OCR engine...</div>
                         <div class="text-sm" style="color: var(--text-secondary);">First time only (2-3MB)</div>
                     </div>
                     <button class="btn btn-primary w-full" onclick="triggerCamera()">
-                        [Cam] Take Photo
+                        Take Photo
                     </button>
                     <button class="btn btn-outline w-full" onclick="triggerGallery()">
-                        [Img] Choose from Gallery
+                        Choose from Gallery
                     </button>
                     <div class="text-center text-xs mt-4" style="color: var(--text-secondary);">
-                        [Tip] Tip: Make sure receipt is well-lit and flat
+                        Tip: Make sure receipt is well-lit and flat
                     </div>
                 </div>
                 <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
@@ -337,7 +344,7 @@
                     
                     <!-- Receipt Summary -->
                     <div id="receiptSummary" class="hidden card mt-4" style="border-color: var(--success);">
-                        <div class="text-sm font-bold mb-2" style="color: var(--success);">[OK] Scanned Summary</div>
+                        <div class="text-sm font-bold mb-2" style="color: var(--success);">Scanned Summary</div>
                         <div class="space-y-1 text-sm">
                             <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal:</span><span id="scannedSubtotal">$0.00</span></div>
                             <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax:</span><span id="scannedTax">$0.00</span></div>
@@ -368,7 +375,7 @@ Total $48.15"></textarea>
                 <button class="btn btn-outline w-full mb-4" onclick="addManualItem()">Add Item</button>
             </div>
             
-            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">[Cam] Upload a receipt first</button>
+            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">Upload a receipt first</button>
         </div>
     </div>
 
@@ -461,11 +468,11 @@ Total $48.15"></textarea>
               /^(phone|fax|tel|www|http|email|date|time|server|cashier|order#|check#|receipt#)/i,
               /^(payment|card|credit|debit|change|balance|cash|visa|mastercard|amex|discover)/i,
               /^(thank|please|come|visit|follow|like|share)/i, // Marketing text
+              /^(subtotal|tax|tip|total|amount|balance)/i, // Financial summary words alone
             ];
           }
 
           extractAllPrices(text) {
-            // Multiple patterns to catch different receipt formats
             const patterns = [
               /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/g, // Standard $XX.XX
               /(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})\s*[$€£]?/g, // XX.XX$ format
@@ -476,7 +483,6 @@ Total $48.15"></textarea>
             for (const regex of patterns) {
               let match;
               while ((match = regex.exec(text)) !== null) {
-                // Skip if this index already has a match (avoid duplicates)
                 if (matches.some(m => Math.abs(m.index - match.index) < 3)) continue;
                 
                 const raw = match[0];
@@ -484,7 +490,6 @@ Total $48.15"></textarea>
                 const cents = match[2];
                 const value = parseFloat(`${dollars}.${cents}`);
                 
-                // Find the full line
                 const lineStart = text.lastIndexOf('\n', match.index) + 1;
                 const lineEnd = text.indexOf('\n', match.index);
                 const line = text.substring(lineStart, lineEnd > -1 ? lineEnd : text.length).trim();
@@ -499,24 +504,24 @@ Total $48.15"></textarea>
           identifyLineType(line) {
             const lower = line.toLowerCase().trim();
             
-            // Total detection - be careful not to match "subtotal"
-            if (/(^|\s)(total|amount\s*due|balance\s*due|grand\s*total|check\s*total)(\s|$)/.test(lower) && 
-                !lower.includes('subtotal') && !lower.includes('item')) {
+            // Strong total indicators (must be at end or standalone)
+            if (/(^|\s)(total|amount\s*due|balance\s*due|grand\s*total|check\s*total)(\s*|:|$)/.test(lower) && 
+                !lower.includes('subtotal') && !lower.match(/item\s*total/)) {
               return 'total';
             }
             
             // Tax detection
-            if (/(^|\s)(tax|vat|gst|hst|sales\s*tax)(\s|:|$)/.test(lower)) {
+            if (/(^|\s)(tax|vat|gst|hst|sales\s*tax)(\s*|:|$)/.test(lower)) {
               return 'tax';
             }
             
             // Tip detection  
-            if (/(^|\s)(tip|gratuity|service\s*charge|service\s*fee)(\s|:|$)/.test(lower)) {
+            if (/(^|\s)(tip|gratuity|service\s*charge|service\s*fee)(\s*|:|$)/.test(lower)) {
               return 'tip';
             }
             
             // Subtotal detection
-            if (/(^|\s)(subtotal|sub\s*total|sub\s*-?\s*total)(\s|:|$)/.test(lower)) {
+            if (/(^|\s)(subtotal|sub\s*total|sub\s*-?\s*total|item\s*subtotal)(\s*|:|$)/.test(lower)) {
               return 'subtotal';
             }
             
@@ -526,18 +531,18 @@ Total $48.15"></textarea>
           cleanItemName(line, price) {
             let name = line;
             
-            // Remove the price - try multiple patterns
+            // Remove the price
             name = name.replace(/[$€£]?\s*\d[\d,\s]*[\.\,]\s*\d{2}\s*[$€£]?/g, '');
             
-            // Remove quantities at start (like "2x", "2 @", "2 *")
-            name = name.replace(/^(\d+)\s*[@x×\*\.]?\s*/i, '');
+            // Remove quantities at start
+            name = name.replace(/^(\d+)\s*[@x×\*\.\-]?\s*/i, '');
             
-            // Remove item codes (like #123, @ABC)
+            // Remove item codes
             name = name.replace(/^[@#]\s*\w+\s*/, '');
             
-            // Clean up whitespace and special chars
+            // Clean up
             name = name.replace(/\s+/g, ' ').trim();
-            name = name.replace(/^[-–—]+|[-–—]+$/g, '').trim();
+            name = name.replace(/^[-–—.:]+|[-–—.:]+$/g, '').trim();
             
             return name;
           }
@@ -545,75 +550,112 @@ Total $48.15"></textarea>
           isValidItem(name, price) {
             if (!name || name.length < 2) return false;
             if (!price || price <= 0) return false;
-            
-            // Must have at least one letter
             if (!/[a-zA-Z]/.test(name)) return false;
             
             const lower = name.toLowerCase();
             
-            // Check skip patterns
             for (const pattern of this.skipPatterns) {
               if (pattern.test(lower)) return false;
             }
             
-            // Skip common non-item words
+            // Skip standalone financial words
             const skipWords = ['total', 'tax', 'tip', 'subtotal', 'change', 'cash', 'credit', 
-                             'debit', 'gift', 'card', 'tendered', 'due', 'saved', 'discount'];
+                             'debit', 'gift', 'card', 'tendered', 'due', 'saved', 'discount',
+                             'amount', 'balance', 'payment'];
             for (const word of skipWords) {
-              if (lower === word || lower.startsWith(word + ' ')) return false;
+              if (lower === word || lower.startsWith(word + ' ') || lower.endsWith(' ' + word)) return false;
             }
             
             return true;
           }
 
-          findBestTotal(prices) {
-            // Strategy: The total should be:
-            // 1. Labeled as "total" or similar
-            // 2. Or the largest amount that's not a subtotal
-            // 3. Or the last price on the receipt
-            
-            const sortedByValue = [...prices].sort((a, b) => b.value - a.value);
-            const sortedByPosition = [...prices].sort((a, b) => a.index - b.index);
-            
-            let total = 0;
-            let totalConfidence = 0;
-            
+          findTotal(prices) {
+            // First pass: look for explicit total label
             for (const price of prices) {
               const type = this.identifyLineType(price.line);
               if (type === 'total') {
-                // High confidence if explicitly labeled
-                return { value: price.value, confidence: 'high' };
+                return { value: price.value, method: 'labeled' };
               }
             }
             
-            // If no explicit total, use heuristics
-            // Usually total is near the end and is one of the largest values
-            const lastFew = sortedByPosition.slice(-3);
+            // Second pass: find largest value in last 3 prices (excluding subtotal/tax/tip labels)
+            const sortedByPos = [...prices].sort((a, b) => a.index - b.index);
+            const lastFew = sortedByPos.slice(-4);
+            
+            let bestTotal = 0;
             for (const price of lastFew) {
               const type = this.identifyLineType(price.line);
-              if (type !== 'subtotal' && price.value > total) {
-                total = price.value;
+              if (type !== 'subtotal' && type !== 'tax' && type !== 'tip' && price.value > bestTotal) {
+                bestTotal = price.value;
               }
             }
             
-            // If still no total, take largest that's not subtotal
-            if (total === 0) {
-              for (const price of sortedByValue) {
-                const type = this.identifyLineType(price.line);
-                if (type !== 'subtotal' && type !== 'tax' && type !== 'tip') {
-                  total = price.value;
-                  break;
-                }
+            if (bestTotal > 0) {
+              return { value: bestTotal, method: 'largest_last' };
+            }
+            
+            // Fallback: largest overall
+            const sortedByVal = [...prices].sort((a, b) => b.value - a.value);
+            return { value: sortedByVal[0]?.value || 0, method: 'largest' };
+          }
+
+          findTaxAndTip(prices, total) {
+            let tax = 0;
+            let tip = 0;
+            let subtotal = 0;
+            
+            for (const price of prices) {
+              const type = this.identifyLineType(price.line);
+              const val = price.value;
+              
+              if (type === 'tax' && val !== total) {
+                tax = val;
+              } else if (type === 'tip' && val !== total) {
+                tip = val;
+              } else if (type === 'subtotal' && val !== total) {
+                subtotal = val;
               }
             }
             
-            return { value: total, confidence: total > 0 ? 'medium' : 'low' };
+            return { tax, tip, subtotal };
+          }
+
+          validateReceiptMath(items, tax, tip, total, subtotal) {
+            // Calculate what items sum to
+            const itemsTotal = items.reduce((sum, item) => sum + item.price, 0);
+            
+            // If we have subtotal, items should match it
+            if (subtotal > 0 && Math.abs(itemsTotal - subtotal) > 0.5) {
+              // Items don't match subtotal - possible issue
+              return { valid: false, issue: 'items_mismatch', itemsTotal, expected: subtotal };
+            }
+            
+            // If we have all values, check: items + tax + tip = total
+            const calculatedTotal = (subtotal || itemsTotal) + tax + tip;
+            
+            if (total > 0 && Math.abs(calculatedTotal - total) > 0.5) {
+              // Math doesn't add up
+              const diff = total - calculatedTotal;
+              
+              // Maybe we missed tax?
+              if (tax === 0 && diff > 0.5 && diff < total * 0.2) {
+                return { valid: true, adjustedTax: diff, note: 'added_missing_tax' };
+              }
+              
+              // Maybe we missed tip?
+              if (tip === 0 && diff > 0.5 && diff < total * 0.25) {
+                return { valid: true, adjustedTip: diff, note: 'added_missing_tip' };
+              }
+              
+              return { valid: false, issue: 'math_error', calculated: calculatedTotal, expected: total, diff };
+            }
+            
+            return { valid: true, itemsTotal };
           }
 
           parseReceiptText(text) {
             if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
             
-            // Clean up the text
             text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             
             const prices = this.extractAllPrices(text);
@@ -621,76 +663,52 @@ Total $48.15"></textarea>
               return { items: [], tax: 0, tip: 0, total: 0 };
             }
             
+            // Step 1: Find the total
+            const totalInfo = this.findTotal(prices);
+            const total = totalInfo.value;
+            
+            // Step 2: Find tax, tip, subtotal
+            const { tax, tip, subtotal } = this.findTaxAndTip(prices, total);
+            
+            // Step 3: Extract items (prices that aren't total/tax/tip/subtotal)
             let items = [];
-            let tax = 0;
-            let tip = 0;
-            let total = 0;
-            let subtotal = 0;
+            const usedIndices = new Set();
             
-            // Find total first
-            const totalResult = this.findBestTotal(prices);
-            total = totalResult.value;
-            
-            // Process each price
-            const processedIndices = new Set();
-            
+            // Mark used prices
             for (const price of prices) {
-              // Skip if already processed (for duplicates)
-              if (processedIndices.has(price.index)) continue;
-              
               const type = this.identifyLineType(price.line);
-              
-              if (type === 'total' && price.value === total) {
-                processedIndices.add(price.index);
-                continue; // Already have this
-              } else if (type === 'tax') {
-                tax = price.value;
-                processedIndices.add(price.index);
-              } else if (type === 'tip') {
-                tip = price.value;
-                processedIndices.add(price.index);
-              } else if (type === 'subtotal') {
-                subtotal = price.value;
-                processedIndices.add(price.index);
-              } else {
-                // It's likely an item
-                const name = this.cleanItemName(price.line, price.value);
-                
-                // Skip if matches total/tax/tip/subtotal exactly
-                if (price.value === total || price.value === tax || 
-                    price.value === tip || price.value === subtotal) {
-                  continue;
-                }
-                
-                // Skip very small amounts (likely not items, or partial tax)
-                if (price.value < 0.25) continue;
-                
-                // Skip if it's suspiciously large (might be total we missed)
-                if (total > 0 && price.value > total * 0.9 && price.value !== total) {
-                  continue;
-                }
-                
-                if (this.isValidItem(name, price.value)) {
-                  // Extract quantity
-                  let qty = 1;
-                  const qtyMatch = price.line.match(/^(\d+)\s*[@x×\*\.]?\s*/i);
-                  if (qtyMatch) {
-                    qty = parseInt(qtyMatch[1]);
-                    // Sanity check on quantity
-                    if (qty > 50) qty = 1; // Probably not right
-                  }
-                  
-                  items.push({ 
-                    name, 
-                    price: price.value, 
-                    quantity: qty,
-                    line: price.line // Keep for debugging
-                  });
-                }
+              if (type !== 'item' || price.value === total) {
+                usedIndices.add(price.index);
               }
             }
             
-            // Combine duplicates
+            for (const price of prices) {
+              if (usedIndices.has(price.index)) continue;
+              if (price.value === total) continue;
+              if (price.value < 0.5) continue; // Too small
+              
+              // Skip if close to tax/tip/total (within 1 cent)
+              const closeToTax = tax > 0 && Math.abs(price.value - tax) < 0.01;
+              const closeToTip = tip > 0 && Math.abs(price.value - tip) < 0.01;
+              const closeToTotal = Math.abs(price.value - total) < 0.01;
+              
+              if (closeToTax || closeToTip || closeToTotal) continue;
+              
+              const name = this.cleanItemName(price.line, price.value);
+              
+              if (this.isValidItem(name, price.value)) {
+                let qty = 1;
+                const qtyMatch = price.line.match(/^(\d+)\s*[@x×\*\.\-]?\s*/i);
+                if (qtyMatch) {
+                  qty = parseInt(qtyMatch[1]);
+                  if (qty > 50 || qty < 1) qty = 1;
+                }
+                
+                items.push({ name, price: price.value, quantity: qty });
+              }
+            }
+            
+            // Step 4: Combine duplicates
             const combinedItems = [];
             const itemMap = new Map();
             
@@ -701,37 +719,36 @@ Total $48.15"></textarea>
                 existing.quantity += item.quantity;
                 existing.price += item.price;
               } else {
-                const newItem = { ...item };
-                delete newItem.line; // Remove debug info
-                combinedItems.push(newItem);
-                itemMap.set(key, newItem);
+                combinedItems.push({ ...item });
+                itemMap.set(key, combinedItems[combinedItems.length - 1]);
               }
             }
             
-            // Calculate subtotal if not found
-            if (subtotal === 0 && combinedItems.length > 0) {
-              subtotal = combinedItems.reduce((sum, item) => sum + item.price, 0);
-            }
+            // Step 5: Calculate subtotal if missing
+            const calculatedSubtotal = combinedItems.reduce((sum, item) => sum + item.price, 0);
+            const finalSubtotal = subtotal > 0 ? subtotal : calculatedSubtotal;
             
-            // Sanity check: if calculated subtotal + tax + tip != total, adjust
-            if (total > 0 && subtotal > 0) {
-              const calculatedTotal = subtotal + tax + tip;
-              if (Math.abs(calculatedTotal - total) > 0.01) {
-                // Might have missed tax or tip - try to figure out which
-                if (tax === 0 && tip === 0) {
-                  // Assume the difference is tax (common case)
-                  tax = parseFloat((total - subtotal).toFixed(2));
-                }
-              }
+            // Step 6: Validate and adjust
+            let finalTax = tax;
+            let finalTip = tip;
+            
+            const validation = this.validateReceiptMath(combinedItems, tax, tip, total, finalSubtotal);
+            
+            if (validation.adjustedTax) {
+              finalTax = validation.adjustedTax;
+            }
+            if (validation.adjustedTip) {
+              finalTip = validation.adjustedTip;
             }
             
             return { 
               items: combinedItems, 
-              tax, 
-              tip, 
+              tax: finalTax, 
+              tip: finalTip, 
               total,
-              subtotal,
-              confidence: totalResult.confidence
+              subtotal: finalSubtotal,
+              validation,
+              totalMethod: totalInfo.method
             };
           }
         }
@@ -1410,11 +1427,11 @@ Total $48.15"></textarea>
                 if (extractedItemsFromImage.length === 0) {
                     continueBtn.disabled = true;
                     continueBtn.style.opacity = '0.5';
-                    continueBtn.textContent = '[Cam] Upload a receipt first';
+                    continueBtn.textContent = 'Upload a receipt first';
                 } else {
                     continueBtn.disabled = false;
                     continueBtn.style.opacity = '1';
-                    continueBtn.textContent = '[OK] Continue';
+                    continueBtn.textContent = 'Continue';
                 }
             }
         }
@@ -1427,6 +1444,24 @@ Total $48.15"></textarea>
 
         function triggerGallery() {
             document.getElementById('galleryImage').click();
+        }
+
+        function rescanReceipt() {
+            // Reset and open camera again
+            document.getElementById('cameraResults').classList.add('hidden');
+            document.getElementById('rescanButtons').classList.add('hidden');
+            document.getElementById('receiptSummary').classList.add('hidden');
+            extractedItemsFromImage = [];
+            triggerCamera();
+        }
+
+        function rescanGallery() {
+            // Reset and open gallery again
+            document.getElementById('cameraResults').classList.add('hidden');
+            document.getElementById('rescanButtons').classList.add('hidden');
+            document.getElementById('receiptSummary').classList.add('hidden');
+            extractedItemsFromImage = [];
+            triggerGallery();
         }
 
         function handleImageUpload(event) {
@@ -1537,7 +1572,7 @@ Total $48.15"></textarea>
             let text = '';
             
             try {
-                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">[Read] Reading receipt with AI...</div>';
+                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">Reading receipt with AI...</div>';
                 
                 // Try Google Vision API first (if key is configured)
                 if (GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY !== 'YOUR_API_KEY_HERE') {
@@ -1596,6 +1631,7 @@ Total $48.15"></textarea>
                 
                 scanningOverlay.classList.add('hidden');
                 document.getElementById('cameraResults').classList.remove('hidden');
+                document.getElementById('rescanButtons').classList.remove('hidden');
                 renderExtractedItems();
                 
                 // Show summary
@@ -1604,12 +1640,13 @@ Total $48.15"></textarea>
                 // Enable continue button after successful scan
                 continueBtn.disabled = false;
                 continueBtn.style.opacity = '1';
-                continueBtn.textContent = '✓ Continue';
+                continueBtn.textContent = 'Continue';
                 
             } catch (error) {
                 console.error('OCR Error:', error);
-                scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">[Err] Error reading receipt</div>';
-                continueBtn.textContent = '[Err] Error - Try Paste Instead';
+                scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">Error reading receipt</div>';
+                document.getElementById('rescanButtons').classList.remove('hidden');
+                continueBtn.textContent = 'Error - Try Paste Instead';
                 setTimeout(() => {
                     scanningOverlay.classList.add('hidden');
                     setTab('paste');
@@ -1725,7 +1762,7 @@ Total $48.15"></textarea>
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.style.opacity = '1';
-            continueBtn.textContent = '[OK] Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
+            continueBtn.textContent = 'Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
             
             alert('Item added: ' + name + ' - $' + price.toFixed(2));
         }
@@ -1762,7 +1799,7 @@ Total $48.15"></textarea>
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.style.opacity = '1';
-            continueBtn.textContent = '[OK] Continue';
+            continueBtn.textContent = 'Continue';
             
             hideAddItemModal();
         }
