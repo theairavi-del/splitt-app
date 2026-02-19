@@ -1484,7 +1484,9 @@ Total $48.15"></textarea>
         }
 
         // Google Vision API Configuration
-        const GOOGLE_VISION_API_KEY = 'AIzaSyAIaHGqIlBs8mpBrSe3bpNYVMWnKKPHwLg';
+        // SECURITY: Add your API key here. Get one at https://console.cloud.google.com/
+        // Then add HTTP referrer restrictions to prevent abuse
+        const GOOGLE_VISION_API_KEY = ''; // Add your key here
         
         // Image preprocessing for better OCR
         async function preprocessImage(imageBase64) {
