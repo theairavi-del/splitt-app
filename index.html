@@ -59,38 +59,22 @@
         .item-card.unclaimed { border-color: var(--warning); animation: glow 2s infinite; }
         .hidden { display: none !important; }
         
-        /* Divvi Logo Styles */
+        /* Divvi Logo - Simple Helvetica */
         .logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 900;
-            font-size: 1.5rem;
-            letter-spacing: -1px;
+            font-weight: 700;
+            font-size: 1.75rem;
+            letter-spacing: -0.5px;
+            color: var(--text);
         }
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            color: white;
-            transform: rotate(-5deg);
-            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
-        }
-        .logo:hover .logo-icon {
-            transform: rotate(0deg) scale(1.1);
-            transition: transform 0.2s ease;
+        .logo span {
+            color: var(--primary);
         }
     </style>
 </head>
 <body>
     <!-- Navigation -->
     <nav class="nav" id="nav" style="display: none;">
-        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen"><span class="logo-icon">◊</span><span style="color: var(--primary);">Divvi</span></div>
+        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen">Div<span>vi</span></div>
         <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
     </nav>
 
@@ -98,7 +82,7 @@
     <div class="screen active" id="welcomeScreen">
         <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
         <div class="absolute top-0 left-0 right-0 p-4 text-center">
-            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="Divvi - Click to refresh"><span class="logo-icon">◊</span><span style="color: var(--primary);">Divvi</span></div>
+            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="Divvi - Click to refresh">Div<span>vi</span></div>
         </div>
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
