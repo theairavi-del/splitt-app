@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>SPLITT v3 - Split Bills Instantly</title>
+    <title>Divvi v3 - Split Bills Instantly</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
@@ -58,12 +58,39 @@
         .item-card { background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
         .item-card.unclaimed { border-color: var(--warning); animation: glow 2s infinite; }
         .hidden { display: none !important; }
+        
+        /* Divvi Logo Styles */
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 900;
+            font-size: 1.5rem;
+            letter-spacing: -1px;
+        }
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+            transform: rotate(-5deg);
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+        }
+        .logo:hover .logo-icon {
+            transform: rotate(0deg) scale(1.1);
+            transition: transform 0.2s ease;
+        }
     </style>
 </head>
 <body>
     <!-- Navigation -->
     <nav class="nav" id="nav" style="display: none;">
-        <div class="text-2xl font-black cursor-pointer" style="color: var(--primary);" onclick="goHome()" title="Go to welcome screen">SPLITT</div>
+        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen"><span class="logo-icon">◊</span><span style="color: var(--primary);">Divvi</span></div>
         <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
     </nav>
 
@@ -71,7 +98,7 @@
     <div class="screen active" id="welcomeScreen">
         <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
         <div class="absolute top-0 left-0 right-0 p-4 text-center">
-            <div class="text-2xl font-black cursor-pointer inline-block" style="color: var(--primary);" onclick="goHome()" title="SPLITT - Click to refresh">SPLITT</div>
+            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="Divvi - Click to refresh"><span class="logo-icon">◊</span><span style="color: var(--primary);">Divvi</span></div>
         </div>
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
@@ -320,7 +347,7 @@ Total $48.15"></textarea>
 
     <script>
         /**
-         * SPLITT - Logic & State
+         * Divvi - Logic & State
          */
 
         class ReceiptParser {
@@ -690,7 +717,7 @@ Total $48.15"></textarea>
 
         window.onload = () => {
             // Clear any previous session on load (Bug 1 fix: reset on refresh)
-            storage.removeItem('splitt_user_state');
+            storage.removeItem('divvi_user_state');
             
             // Check for room code in URL (Bug 8 fix: auto-join from shared link)
             const urlParams = new URLSearchParams(window.location.search);
@@ -768,13 +795,13 @@ Total $48.15"></textarea>
 
         function loadSession() {
             // Clear any in-progress state on page refresh (Bug 1 fix)
-            storage.removeItem('splitt_user_state');
+            storage.removeItem('divvi_user_state');
             // Don't auto-restore - force user to rejoin
         }
 
         function saveSession() {
             state.session.lastModified = Date.now();
-            storage.setItem('splitt_user_state', JSON.stringify(state));
+            storage.setItem('divvi_user_state', JSON.stringify(state));
             storage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
             
             // Also save to Supabase for cross-device sync
@@ -878,7 +905,7 @@ Total $48.15"></textarea>
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && (key.startsWith('room_') || key === 'splitt_user_state')) {
+                if (key && (key.startsWith('room_') || key === 'divvi_user_state')) {
                     keysToRemove.push(key);
                 }
             }
@@ -907,7 +934,7 @@ Total $48.15"></textarea>
         
         // Before unload handler - clear state on page refresh (Bug 1 fix)
         window.addEventListener('beforeunload', () => {
-            storage.removeItem('splitt_user_state');
+            storage.removeItem('divvi_user_state');
         });
 
         function createRoom() {
@@ -1058,7 +1085,7 @@ Total $48.15"></textarea>
             state.roomCode = null;
             state.isHost = false;
             state.userId = null;
-            storage.removeItem('splitt_user_state');
+            storage.removeItem('divvi_user_state');
             showScreen('welcome');
         }
         
@@ -1131,7 +1158,7 @@ Total $48.15"></textarea>
             const shareUrl = window.location.origin + window.location.pathname + '?room=' + state.roomCode;
             if (navigator.share) {
                 navigator.share({
-                    title: 'Join my SPLITT room',
+                    title: 'Join my Divvi room',
                     text: 'Room code: ' + state.roomCode,
                     url: shareUrl
                 });
@@ -1213,7 +1240,7 @@ Total $48.15"></textarea>
                 state.roomCode = null;
                 state.isHost = false;
                 state.userId = null;
-                storage.removeItem('splitt_user_state');
+                storage.removeItem('divvi_user_state');
                 showScreen('welcome');
                 return true;
             }
