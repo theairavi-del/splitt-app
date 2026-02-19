@@ -70,6 +70,112 @@
         .logo span {
             color: var(--primary);
         }
+        
+        /* Custom Confirmation Modal */
+        .confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 2000;
+        }
+        .confirm-modal.active {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .confirm-content {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            width: 100%;
+            max-width: 340px;
+            text-align: center;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .confirm-message {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .confirm-btn {
+            flex: 1;
+            min-height: 48px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .confirm-btn:active {
+            transform: scale(0.97);
+        }
+        .confirm-btn-cancel {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text);
+        }
+        .confirm-btn-confirm {
+            background: var(--error);
+            color: white;
+        }
+        
+        /* Avatar with X button for host */
+        .avatar-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .avatar-remove {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 22px;
+            height: 22px;
+            background: var(--error);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            border: 2px solid var(--surface);
+            transition: all 0.15s;
+            z-index: 10;
+        }
+        .avatar-remove:hover {
+            transform: scale(1.1);
+            background: #dc2626;
+        }
+        .avatar-remove:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
@@ -136,6 +242,18 @@
             <div class="flex gap-3">
                 <button class="btn btn-outline flex-1" onclick="hideAddItemModal()">Cancel</button>
                 <button class="btn btn-success flex-1" onclick="addMissingItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Modal -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-content">
+            <div class="confirm-title" id="confirmTitle">Confirm</div>
+            <div class="confirm-message" id="confirmMessage">Are you sure?</div>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-btn-cancel" onclick="hideConfirmModal()">Cancel</button>
+                <button class="confirm-btn confirm-btn-confirm" onclick="confirmModalYes()">Leave</button>
             </div>
         </div>
     </div>
@@ -879,9 +997,34 @@ Total $48.15"></textarea>
                 return;
             }
             
-            if (confirm('Leave current split and return to welcome screen?')) {
-                leaveRoom();
+            // Show custom confirmation modal
+            showConfirmModal(
+                'Leave Split?',
+                'You will lose your progress in this split. Are you sure?',
+                () => leaveRoom()
+            );
+        }
+        
+        // Custom confirmation modal functions
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmModal').classList.add('active');
+            
+            // Store callback
+            window.confirmCallback = onConfirm;
+        }
+        
+        function hideConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+            window.confirmCallback = null;
+        }
+        
+        function confirmModalYes() {
+            if (window.confirmCallback) {
+                window.confirmCallback();
             }
+            hideConfirmModal();
         }
 
         // BUG 12 FIX: Clear all room state for fresh session
@@ -1160,13 +1303,15 @@ Total $48.15"></textarea>
                 const d = document.createElement('div');
                 d.className = 'flex flex-col items-center gap-1';
                 
-                // BUG 9 FIX: Add kick button for host (only for other users, not self)
+                // BUG 9 FIX: Add X button for host (only for other users, not self)
                 const showKickButton = state.isHost && p.id !== state.userId;
                 
                 d.innerHTML = `
-                    <div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div>
+                    <div class="avatar-wrapper">
+                        <div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div>
+                        ${showKickButton ? `<div class="avatar-remove" onclick="kickUser('${p.id}')" title="Remove ${p.name}">×</div>` : ''}
+                    </div>
                     <div class="text-xs text-gray-400">${p.name}</div>
-                    ${showKickButton ? `<button onclick="kickUser('${p.id}')" class="text-xs text-red-400 hover:text-red-300 mt-1" style="background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px;">[Remove]</button>` : ''}
                 `;
                 list.appendChild(d);
             });
@@ -1179,25 +1324,30 @@ Total $48.15"></textarea>
             const userToKick = state.session.participants.find(p => p.id === userId);
             if (!userToKick) return;
             
-            if (!confirm(`Remove ${userToKick.name} from the room?`)) return;
-            
-            // Remove user from participants
-            state.session.participants = state.session.participants.filter(p => p.id !== userId);
-            
-            // Remove user's selections
-            for (const itemId in state.session.selections) {
-                state.session.selections[itemId] = state.session.selections[itemId].filter(s => s.userId !== userId);
-            }
-            
-            // Mark this user as kicked so they can't rejoin (store in session)
-            if (!state.session.kickedUsers) state.session.kickedUsers = [];
-            state.session.kickedUsers.push(userId);
-            
-            // Also store in localStorage with user-specific key for cross-session tracking
-            storage.setItem('kicked_user_' + userId + '_' + state.roomCode, 'true');
-            
-            saveSession();
-            renderPlayers();
+            // Use custom confirm modal
+            showConfirmModal(
+                'Remove Player?',
+                `Remove ${userToKick.name} from this split?`,
+                () => {
+                    // Remove user from participants
+                    state.session.participants = state.session.participants.filter(p => p.id !== userId);
+                    
+                    // Remove user's selections
+                    for (const itemId in state.session.selections) {
+                        state.session.selections[itemId] = state.session.selections[itemId].filter(s => s.userId !== userId);
+                    }
+                    
+                    // Mark this user as kicked so they can't rejoin (store in session)
+                    if (!state.session.kickedUsers) state.session.kickedUsers = [];
+                    state.session.kickedUsers.push(userId);
+                    
+                    // Also store in localStorage with user-specific key for cross-session tracking
+                    storage.setItem('kicked_user_' + userId + '_' + state.roomCode, 'true');
+                    
+                    saveSession();
+                    renderPlayers();
+                }
+            );
         }
         
         // BUG 9 FIX: Check if current user was kicked and show message
