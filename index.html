@@ -61,10 +61,11 @@
         
         /* Divvi Logo - Simple Helvetica */
         .logo {
-            font-weight: 700;
+            font-weight: 900;
             font-size: 1.75rem;
-            letter-spacing: -0.5px;
+            letter-spacing: 2px;
             color: var(--text);
+            text-transform: uppercase;
         }
         .logo span {
             color: var(--primary);
@@ -74,7 +75,7 @@
 <body>
     <!-- Navigation -->
     <nav class="nav" id="nav" style="display: none;">
-        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen">Div<span>vi</span></div>
+        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen">DIV<span>VI</span></div>
         <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
     </nav>
 
@@ -82,7 +83,7 @@
     <div class="screen active" id="welcomeScreen">
         <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
         <div class="absolute top-0 left-0 right-0 p-4 text-center">
-            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="Divvi - Click to refresh">Div<span>vi</span></div>
+            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="Divvi - Click to refresh">DIV<span>VI</span></div>
         </div>
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
