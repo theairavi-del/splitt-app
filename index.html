@@ -7,6 +7,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>SPLITT v3 - Split Bills Instantly</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
@@ -24,7 +27,7 @@
             --text-secondary: #a1a1a1;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Courier New', Courier, monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+        body { font-family: 'VT323', monospace; font-size: 18px; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
         .screen { display: none; min-height: 100vh; animation: slideIn 0.3s ease; }
         .screen.active { display: flex; flex-direction: column; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
