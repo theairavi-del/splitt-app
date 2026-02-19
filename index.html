@@ -9,7 +9,7 @@
     <title>SPLITT v3 - Split Bills Instantly</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
@@ -27,7 +27,22 @@
             --text-secondary: #a1a1a1;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'VT323', monospace; font-size: 18px; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+        body { 
+            font-family: 'Space Mono', 'Courier New', Consolas, monospace; 
+            font-size: 15px; 
+            background: var(--bg); 
+            color: var(--text); 
+            min-height: 100vh; 
+            overflow-x: hidden;
+            /* Receipt printer roughening effect */
+            text-shadow: 0 0 0.5px rgba(255,255,255,0.3);
+            letter-spacing: -0.3px;
+        }
+        /* Thermal print fade effect on text */
+        .receipt-text {
+            opacity: 0.92;
+            filter: contrast(1.1);
+        }
         .screen { display: none; min-height: 100vh; animation: slideIn 0.3s ease; }
         .screen.active { display: flex; flex-direction: column; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
